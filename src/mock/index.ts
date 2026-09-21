@@ -1,0 +1,70 @@
+import { USE_MOCK } from '../config'
+import {
+  getCachedReports,
+  getMockProUnlocked,
+  replaceCachedReports,
+  setMockProUnlocked
+} from '../utils/storage'
+import { ReportItem } from '../data/types'
+
+/**
+ * mock 模式：构建期 TARO_APP_MOCK=true 时启用（D4 修订）。
+ * 模拟全部云函数行为（含 PRO 解锁态），无云端即可跑通全流程。
+ */
+export async function mockCall(name: string, data: Record<string, any>): Promise<any> {
+  switch (name) {
+    case 'login':
+      return { ok: true, openid: 'mock-openid' }
+
+    case 'getStats':
+      // D20 修订：只返回真实报告计数，虚构基数已废弃
+      return { ok: true, reportsTotal: getCachedReports().length }
+
+    case 'submitTest': {
+      if (data.version === 'pro' && !getMockProUnlocked()) {
+        return { ok: false, error: 'NO_PAID_ORDER' }
+      }
+      if (data.version === 'pro') setMockProUnlocked(false)
+      const report: ReportItem = {
+        _id: data.sessionId || `mock-${Date.now()}`, // docId=sessionId，与云端幂等语义一致（03 §5）
+        version: data.version,
+        result: data.result,
+        sessionId: data.sessionId,
+        answers: data.answers,
+        createdAt: new Date().toISOString()
+      }
+      replaceCachedReports([report, ...getCachedReports()])
+      return { ok: true, reportId: report._id }
+    }
+
+    case 'getReports':
+      return { ok: true, reports: getCachedReports() }
+
+    case 'createOrder':
+      // 模拟支付：直接置为已解锁
+      setMockProUnlocked(true)
+      return { ok: true, outTradeNo: `mock-${Date.now()}`, payment: null }
+
+    case 'checkOrder':
+      return { ok: true, hasPaidUnused: getMockProUnlocked() }
+
+    case 'submitFeedback':
+      return { ok: true }
+
+    case 'sessionSync':
+      // mock：本地 storage 即真相源，云端同步为空操作
+      return { ok: true }
+
+    case 'track':
+      // M10：mock 模式埋点为空操作
+      return { ok: true }
+
+    case 'deleteMyData':
+      return { ok: true }
+
+    default:
+      return { ok: false, error: 'UNKNOWN_FUNCTION' }
+  }
+}
+
+export const isMock = () => USE_MOCK

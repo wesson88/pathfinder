@@ -1,0 +1,30 @@
+{
+  "miniprogramRoot": "dist/",
+  "cloudfunctionRoot": "cloud/functions/",
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "career-test",
+  "libVersion": "3.4.10",
+  "condition": {},
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  },
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "setting": {
+    "es6": false,
+    "postcss": false,
+    "minified": false,
+    "enhance": true,
+    "showShadowRootInWxmlPanel": true,
+    "packNpmRelationList": [],
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  }
+}

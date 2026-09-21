@@ -1,0 +1,39 @@
+{
+  "name": "career-test",
+  "version": "1.0.0",
+  "private": true,
+  "description": "天赋星球——职业天赋测评微信小程序（Taro 4 + React + TypeScript + 微信云开发）",
+  "scripts": {
+    "dev:weapp": "npm run build:weapp -- --watch",
+    "build:weapp": "taro build --type weapp"
+  },
+  "browserslist": [
+    "last 3 versions",
+    "Android >= 4.1",
+    "ios >= 8"
+  ],
+  "dependencies": {
+    "@babel/runtime": "^7.24.4",
+    "@tarojs/components": "4.0.9",
+    "@tarojs/helper": "4.0.9",
+    "@tarojs/plugin-framework-react": "4.0.9",
+    "@tarojs/plugin-platform-weapp": "4.0.9",
+    "@tarojs/react": "4.0.9",
+    "@tarojs/runtime": "4.0.9",
+    "@tarojs/shared": "4.0.9",
+    "@tarojs/taro": "4.0.9",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.4",
+    "@tarojs/cli": "4.0.9",
+    "@tarojs/webpack5-runner": "4.0.9",
+    "@types/react": "^18.2.0",
+    "@types/webpack-env": "^1.18.4",
+    "babel-preset-taro": "4.0.9",
+    "sass": "^1.75.0",
+    "typescript": "^5.4.5",
+    "webpack": "^5.91.0"
+  }
+}
