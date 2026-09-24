@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
+import { ScrollView } from '@tarojs/components'
 import { PRICE_PRO_FEN, formatPrice } from '../../config'
 import { AGREEMENTS, AGREEMENT_LINKS, AgreementKey, CHECKBOX_TEXT } from '../../data/agreements'
 import { callCloud, isMockMode, sleep } from '../../utils/cloud'
@@ -23,6 +24,11 @@ export default function PayConfirm() {
   const [paying, setPaying] = useState(false)
   const [modalKey, setModalKey] = useState<AgreementKey | null>(null)
 
+  // M10：pay_view 记录支付页浏览（进页即记，与点击行为区分）
+  useEffect(() => {
+    track('pay_view')
+  }, [])
+
   const openAgreement = (key: AgreementKey) => {
     track('pay_agreement_open', { key })
     setModalKey(key)
@@ -35,7 +41,6 @@ export default function PayConfirm() {
       return
     }
     setPaying(true)
-    track('pay_view', { step: 'create' })
 
     callCloud<{ outTradeNo: string; payment: any }>('createOrder', { version: 'pro' })
       .then(r => {
@@ -71,7 +76,7 @@ export default function PayConfirm() {
       })
       .catch((e: Error) => {
         setPaying(false)
-        Taro.showToast({ title: e?.message === 'CLOUD_ERROR' ? '下单失败，请重试' : '下单失败，请重试', icon: 'none' })
+        Taro.showToast({ title: '下单失败，请重试', icon: 'none' })
       })
   }
 
@@ -111,7 +116,7 @@ export default function PayConfirm() {
         <view className='agree-mask' onClick={() => setModalKey(null)}>
           <view className='agree-panel' onClick={(e) => e.stopPropagation()}>
             <view className='agree-title'>{modal.title}</view>
-            <scroll-view scrollY className='agree-body'>{modal.body}</scroll-view>
+            <ScrollView scrollY className='agree-body'>{modal.body}</ScrollView>
             <view className='btn-primary agree-close' onClick={() => setModalKey(null)}>我已阅读</view>
           </view>
         </view>

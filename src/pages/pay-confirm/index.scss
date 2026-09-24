@@ -75,6 +75,10 @@
 
 .pay-btn {
   margin-top: 16px;
+
+  &.disabled {
+    opacity: 0.45;
+  }
 }
 
 .pay-note {

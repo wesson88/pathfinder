@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import Taro from '@tarojs/taro'
+import { Canvas } from '@tarojs/components'
 import { DIM_ORDER } from '../../data/archetypes'
 import { DimKey, DimScores } from '../../data/types'
 import './index.scss'
@@ -18,20 +19,24 @@ const RING_STEPS = [0.25, 0.5, 0.75, 1]
 /**
  * 五维雷达图（ADR：自绘 Canvas 2D，不引 echarts）。
  * 画布按 devicePixelRatio 放大保证清晰；点按最近顶点回调 onTapDim。
+ * 触点为页面坐标，命中计算前先减去画布的页面偏移（code review 修复）。
  */
 export default function RadarChart({ scores, labels, size = 320, onTapDim }: Props) {
   const canvasId = useRef(`radar-${Math.random().toString(36).slice(2, 8)}`)
   const verticesRef = useRef<{ x: number; y: number; dim: DimKey }[]>([])
+  const offsetRef = useRef<{ left: number; top: number }>({ left: 0, top: 0 })
 
   useEffect(() => {
     const query = Taro.createSelectorQuery()
     query
       .select(`#${canvasId.current}`)
-      .fields({ node: true, size: true })
+      .fields({ node: true, size: true, rect: true })
       .exec((res) => {
         const item = res && res[0]
         if (!item || !item.node) return
         const canvas = item.node
+        // 记录画布页面偏移，供触点坐标换算
+        offsetRef.current = { left: item.left || 0, top: item.top || 0 }
         const dpr = (Taro.getSystemInfoSync().pixelRatio) || 2
         canvas.width = size * dpr
         canvas.height = size * dpr
@@ -124,17 +129,20 @@ export default function RadarChart({ scores, labels, size = 320, onTapDim }: Pro
     if (!onTapDim) return
     const touch = e.changedTouches && e.changedTouches[0]
     if (!touch) return
+    // 页面坐标 → 画布本地坐标
+    const x = touch.x - offsetRef.current.left
+    const y = touch.y - offsetRef.current.top
     let nearest: { d: number; dim: DimKey } | null = null
-    verticesRef.current.forEach((v) => {
-      const d = Math.hypot(v.x - touch.x, v.y - touch.y)
+    for (const v of verticesRef.current) {
+      const d = Math.hypot(v.x - x, v.y - y)
       if (!nearest || d < nearest.d) nearest = { d, dim: v.dim }
-    })
+    }
     // 命中阈值：顶点周围 36px
     if (nearest && nearest.d <= 36) onTapDim(nearest.dim)
   }
 
   return (
-    <canvas
+    <Canvas
       type='2d'
       id={canvasId.current}
       className='radar-canvas'
