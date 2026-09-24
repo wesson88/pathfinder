@@ -66,6 +66,16 @@ export default function Report() {
       .finally(() => setSending(false))
   }
 
+  const onUpsell = () => {
+    track('upsell_tap', { source: 'report' })
+    Taro.navigateTo({ url: '/pages/pay-confirm/index' })
+  }
+
+  const openExplain = (dim: DimKey) => {
+    track('radar_dim_tap', { dim })
+    setExplainDim(dim)
+  }
+
   const retake = () => {
     track('retake_tap', { version: report?.result.version })
     Taro.navigateTo({ url: '/pages/version-select/index' })
@@ -74,7 +84,7 @@ export default function Report() {
   useEffect(() => {
     if (report && !trackedRef.current) {
       trackedRef.current = true
-      track('report_view', { version: report.result.version, reportId: id })
+      track('report_view', { version: report.result.version })
     }
   }, [!!report])
 
@@ -120,7 +130,7 @@ export default function Report() {
       </view>
 
       <view className='card rep-radar'>
-        <RadarChart scores={r.scores} labels={r.radarLabels || DIM_ORDER.map(d => DIM_META[d].label)} onTapDim={setExplainDim} />
+        <RadarChart scores={r.scores} labels={r.radarLabels || DIM_ORDER.map(d => DIM_META[d].label)} onTapDim={openExplain} />
         <view className='rep-radar-tip'>点按雷达图维度，看这条天赋的解释</view>
         <view className='rep-footnote'>{RADAR_NOTE}</view>
       </view>
@@ -139,7 +149,7 @@ export default function Report() {
           const score = r.scores[dim]
           const level = levelOf(score)
           return (
-            <view key={dim} className='dim-row' onClick={() => setExplainDim(dim)}>
+            <view key={dim} className='dim-row' onClick={() => openExplain(dim)}>
               <view className='dim-label'>{DIM_META[dim].label}</view>
               <view className='dim-bar'>
                 <view className='dim-bar-inner' style={{ width: `${score}%` }} />
@@ -186,7 +196,7 @@ export default function Report() {
       )}
 
       {upsellVisible && (
-        <view className='card rep-upsell' onClick={() => Taro.navigateTo({ url: '/pages/pay-confirm/index' })}>
+        <view className='card rep-upsell' onClick={onUpsell}>
           <view className='upsell-title'>{UPSELL_COPY.title}</view>
           <view className='upsell-desc'>{upsellDesc(r.careerFitHint || 0)}</view>
           <view className='btn-primary upsell-btn'>{UPSELL_COPY.cta}</view>

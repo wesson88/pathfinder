@@ -1,45 +1,49 @@
-import Taro from '@tarojs/taro'
+import { currentPlatform } from '../config'
+import { BANK_VERSION } from './scoring'
 import { callCloud } from './cloud'
 import { hasConsent } from './storage'
 
 /**
- * 埋点统一出口（M10 / D22）：轻量自建，fire-and-forget，失败静默，绝不阻塞用户操作。
- * 事件数据云端保留 12 个月（到期由 track 云函数惰性清理）。
- * mock 模式下为空操作（见 mock/index.ts）。
+ * 埋点统一出口（M10 / D22 / D29）：轻量自建，fire-and-forget，失败静默，绝不阻塞用户操作。
+ * 事件名与参数以项目记录《10-模块设计-埋点与数据分析》§3 字典为唯一权威；
+ * 云端 track 云函数持同一白名单（cloud/shared/events.js，npm run check:cloud 校验两边一致）。
  */
 export type TrackEvent =
   | 'home_view'
-  | 'home_cta_click'
-  | 'version_view'
-  | 'version_select'
+  | 'home_cta_tap'
+  | 'version_select_view'
+  | 'select_version'
   | 'quiz_start'
+  | 'quiz_answer'
+  | 'quiz_abandon'
   | 'quiz_submit'
-  | 'quiz_submit_fail'
+  | 'report_view'
+  | 'radar_dim_tap'
+  | 'report_feedback'
+  | 'upsell_tap'
   | 'pay_view'
-  | 'pay_agreement_open'
   | 'pay_success'
   | 'pay_fail'
-  | 'report_view'
-  | 'report_share'
-  | 'record_view'
-  | 'feedback_submit'
-  | 'data_delete'
-  | 'contact_tap'
-  | 'report_feedback'
-  | 'retake_tap'
   | 'share_tap'
+  | 'retake_tap'
+  | 'contact_tap'
+  | 'data_clear'
 
-export function track(event: TrackEvent, props: Record<string, any> = {}) {
+const MAX_PARAMS_BYTES = 1024
+
+export function track(event: TrackEvent, params: Record<string, string | number | boolean | undefined> = {}) {
   // 知情先于采集（09 §5）：用户同意隐私告知前不上报任何行为数据
   if (!hasConsent()) return
-  const p: Record<string, any> = { ...props }
-  try {
-    if (Taro.getCurrentInstance().router?.path) {
-      p.page = Taro.getCurrentInstance().router!.path
-    }
-  } catch { /* ignore */ }
+  const clean: Record<string, string | number | boolean> = {}
+  for (const [k, v] of Object.entries(params)) if (v !== undefined) clean[k] = v
+  if (JSON.stringify(clean).length > MAX_PARAMS_BYTES) return
 
-  callCloud('track', { event, props: p, ts: Date.now() }).catch(() => {
+  callCloud('track', {
+    event,
+    params: clean,
+    platform: currentPlatform(),
+    bankVersion: BANK_VERSION
+  }).catch(() => {
     /* 埋点失败静默，不重试不阻塞 */
   })
 }

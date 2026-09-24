@@ -10,10 +10,10 @@ import './index.scss'
 export default function VersionSelect() {
   const [checking, setChecking] = useState(false)
 
-  useDidShow(() => track('version_view'))
+  useDidShow(() => track('version_select_view'))
 
   const goQuiz = (version: Version) => {
-    track('version_select', { version })
+    track('select_version', { version })
     Taro.redirectTo({ url: `/pages/quiz/index?version=${version}` })
   }
 

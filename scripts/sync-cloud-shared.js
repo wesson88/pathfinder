@@ -8,7 +8,8 @@ const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
 const TARGETS = {
-  'xpay.js': ['createOrder', 'payCallback', 'checkOrder']
+  'xpay.js': ['createOrder', 'payCallback', 'checkOrder'],
+  'events.js': ['track']
 }
 const HEADER = '// ⚠ 自动生成：源文件 cloud/shared/{name}，由 npm run sync:cloud 复制，勿手改\n'
 
@@ -31,5 +32,16 @@ for (const [name, fns] of Object.entries(TARGETS)) {
   }
 }
 
-if (check && drift) process.exit(1)
+// 埋点白名单：前端 TrackEvent 联合类型与云端 EVENTS 必须一致（10 §3 字典）
+const { EVENTS } = require(path.join(ROOT, 'cloud/shared/events.js'))
+const trackTs = fs.readFileSync(path.join(ROOT, 'src/utils/track.ts'), 'utf8')
+const union = trackTs.slice(trackTs.indexOf('export type TrackEvent'), trackTs.indexOf('const MAX_PARAMS_BYTES'))
+const front = [...union.matchAll(/'([a-z_]+)'/g)].map(m => m[1])
+const diff = [...front.filter(e => !EVENTS.includes(e)), ...EVENTS.filter(e => !front.includes(e))]
+if (diff.length) {
+  console.error(`✗ 埋点白名单前后端不一致：${diff.join(', ')}`)
+  drift++
+}
+
+if (drift) process.exit(1)
 console.log(check ? '✓ 共享模块副本一致' : '✓ 同步完成')

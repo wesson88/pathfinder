@@ -25,7 +25,7 @@ export default function Home() {
   const [clearing, setClearing] = useState(false)
 
   useShareAppMessage(() => {
-    track('report_share', { from: 'home' })
+    track('share_tap', { version: 'home' })
     return { title: SHARE_COPY.homeTitle, path: '/pages/home/index' }
   })
 
@@ -50,7 +50,7 @@ export default function Home() {
   }
 
   const onCta = () => {
-    track('home_cta_click', { resume: !!resume, version: resume?.version })
+    track('home_cta_tap', { mode: resume ? 'resume' : 'start', version: resume?.version })
     if (resume) {
       Taro.navigateTo({ url: `/pages/quiz/index?version=${resume.version}` })
     } else {
@@ -72,12 +72,14 @@ export default function Home() {
         Taro.showLoading({ title: '正在清除' })
         callCloud('deleteMyData')
           .then(() => {
+            track('data_clear', { ok: true })
             clearAllLocal()
             setResume(null)
             Taro.hideLoading()
             Taro.showToast({ title: '已清除', icon: 'success' })
           })
           .catch(() => {
+            track('data_clear', { ok: false })
             Taro.hideLoading()
             Taro.showModal({
               title: '部分数据未清除',

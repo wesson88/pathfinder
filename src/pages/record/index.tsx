@@ -11,7 +11,6 @@ import {
   mergeCloudReports,
   questionCount
 } from '../../utils/storage'
-import { track } from '../../utils/track'
 import './index.scss'
 
 const VERSION_LABEL: Record<Version, string> = { fun: '趣味版', pro: 'PRO' }
@@ -21,7 +20,6 @@ export default function Record() {
   const [sessions, setSessions] = useState<QuizSession[]>([])
 
   useDidShow(() => {
-    track('record_view')
     setReports(getCachedReports())
 
     // 未完成会话列表（含双会话规则的次要入口）；getSession 自带 TTL 清理
@@ -42,7 +40,6 @@ export default function Record() {
   const openReport = (id: string) => Taro.navigateTo({ url: `/pages/report/index?id=${id}` })
 
   const continueSession = (s: QuizSession) => {
-    track('record_view', { action: 'continue', version: s.version })
     Taro.navigateTo({ url: `/pages/quiz/index?version=${s.version}` })
   }
 

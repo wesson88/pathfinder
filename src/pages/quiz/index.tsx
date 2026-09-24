@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import Taro, { useRouter } from '@tarojs/taro'
+import Taro, { useDidHide, useRouter, useUnload } from '@tarojs/taro'
 import { bankOf } from '../../data/banks'
 import { AnswerValue, QuizSession, Version } from '../../data/types'
 import { callCloud, isMockMode } from '../../utils/cloud'
@@ -35,6 +35,29 @@ export default function Quiz() {
   const lastSyncRef = useRef(0)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestRef = useRef<QuizSession | null>(null)
+  const submittedRef = useRef(false)
+  const sessionRef = useRef<QuizSession | null>(null)
+  const indexRef = useRef(0)
+  sessionRef.current = session
+  indexRef.current = index
+
+  // 流失定位（10 §3）：离开答题页且未交卷 → quiz_abandon（停在第几题、已答几题）
+  const abandonedAtRef = useRef(-1)
+  const reportAbandon = () => {
+    const s = sessionRef.current
+    if (!s || submittedRef.current) return
+    // 切后台后又卸载会连触两次：同一进度只记一次
+    const answered = Object.keys(s.answers).length
+    if (abandonedAtRef.current === answered) return
+    abandonedAtRef.current = answered
+    track('quiz_abandon', {
+      version,
+      qid: questions[indexRef.current]?.id,
+      answeredCount: Object.keys(s.answers).length
+    })
+  }
+  useDidHide(reportAbandon)
+  useUnload(reportAbandon)
 
   // 初始化会话：进度恢复 / 新建（useEffect 保证副作用只在挂载后发生）
   useEffect(() => {
@@ -42,7 +65,7 @@ export default function Quiz() {
     initedRef.current = true
     const s0 = getSession(version)
     if (s0) {
-      track('quiz_start', { version, resume: true })
+      track('quiz_start', { version, isResume: true })
       setSession(s0)
       setIndex(firstUnansweredIndex(s0, version))
       qStartRef.current = Date.now()
@@ -55,7 +78,7 @@ export default function Quiz() {
     }
     const fresh = newSession(version)
     saveSession(fresh)
-    track('quiz_start', { version, fresh: true })
+    track('quiz_start', { version, isResume: false })
     setSession(fresh)
     setIndex(0)
     qStartRef.current = Date.now()
@@ -133,7 +156,8 @@ export default function Quiz() {
           }
           upsertCachedReport(report)
           clearSession(version)
-          track('quiz_submit', { version, sessionId: s.sessionId })
+          submittedRef.current = true
+          track('quiz_submit', { version, ok: true })
           Taro.redirectTo({ url: `/pages/report/index?id=${r.reportId}` })
         })
         .catch((e: Error) => {
@@ -149,7 +173,7 @@ export default function Quiz() {
             return
           }
           setSubmitError(true)
-          track('quiz_submit_fail', { version })
+          track('quiz_submit', { version, ok: false, error: e?.message })
         })
     } catch {
       setSubmitting(false)
@@ -167,6 +191,7 @@ export default function Quiz() {
     }
     setSession(updated)
     persist(updated)
+    track('quiz_answer', { version, qid: q.id, key: optKey, ms: answer.ms })
 
     if (isSessionComplete(updated)) {
       submit(updated)
