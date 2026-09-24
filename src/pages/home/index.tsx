@@ -8,7 +8,7 @@ import {
   answerCount,
   clearAllLocal,
   getSession,
-  hasConsent,
+  getConsent,
   isSessionComplete,
   questionCount,
   setConsent
@@ -20,7 +20,7 @@ import './index.scss'
 export default function Home() {
   const [reportsTotal, setReportsTotal] = useState(0)
   const [resume, setResume] = useState<{ session: QuizSession; version: Version } | null>(null)
-  const [consented, setConsented] = useState(hasConsent())
+  const [consentDecided, setConsentDecided] = useState(getConsent() !== null)
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [clearing, setClearing] = useState(false)
 
@@ -43,15 +43,15 @@ export default function Home() {
       .catch(() => setReportsTotal(0))
   })
 
-  const onConsent = () => {
-    setConsent()
-    setConsented(true)
-    track('home_view')
+  const onConsent = (state: 'granted' | 'declined') => {
+    setConsent(state)
+    setConsentDecided(true)
+    if (state === 'granted') track('home_view')
   }
 
   const onCta = () => {
     const complete = !!resume && isSessionComplete(resume.session)
-    track('home_cta_tap', { mode: complete ? 'submit' : resume ? 'resume' : 'start', version: resume?.version })
+    track('home_cta_tap', { mode: complete ? 'submit' : resume ? 'resume' : 'start' })
     if (resume) {
       Taro.navigateTo({ url: `/pages/quiz/index?version=${resume.version}${complete ? '&autoSubmit=1' : ''}` })
     } else {
@@ -64,7 +64,7 @@ export default function Home() {
     if (clearing) return
     Taro.showModal({
       title: '清除我的数据',
-      content: '将删除你在本机与云端的答卷、报告、反馈与行为数据。已付费但尚未使用的 PRO 会保留，确定吗？',
+      content: '将永久删除你在本机与云端的答卷、全部报告（含已付费生成的 PRO 报告）、反馈与行为数据，无法恢复；未交卷的作答也会清除。已付费但尚未使用的 PRO 会保留。确定吗？',
       confirmText: '清除',
       confirmColor: '#6D28D9',
       success: (r) => {
@@ -130,7 +130,7 @@ export default function Home() {
         <view className='clear-link' onClick={onClearData}>清除我的数据</view>
       </view>
 
-      {!consented && (
+      {!consentDecided && (
         <view className='consent-mask'>
           <view className='consent-panel'>
             <view className='consent-title'>{CONSENT_COPY.title}</view>
@@ -138,7 +138,8 @@ export default function Home() {
               {CONSENT_COPY.body}
               <text className='consent-link' onClick={() => setPrivacyOpen(true)}>《隐私政策》</text>
             </view>
-            <view className='btn-primary consent-btn' onClick={onConsent}>{CONSENT_COPY.agree}</view>
+            <view className='btn-primary consent-btn' onClick={() => onConsent('granted')}>{CONSENT_COPY.agree}</view>
+            <view className='consent-decline' onClick={() => onConsent('declined')}>{CONSENT_COPY.decline}</view>
           </view>
         </view>
       )}

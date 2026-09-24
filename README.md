@@ -47,15 +47,17 @@ cloud/shared/         云函数共享模块唯一源（xpay 签名查单 / 埋�
 ## 联调清单（上线前）
 
 1. 企业主体认证 + ICP 备案 + 后台开通「小程序虚拟支付」，配置 PRO 道具（安卓 ¥0.99 / iOS 档位 ¥1）
-2. 云函数 `createOrder / payCallback / checkOrder` 配置环境变量：`WX_APPID`、`WX_APPSECRET`、`XPAY_ENV`（1 沙箱 / 0 正式）、`XPAY_OFFER_ID`、`XPAY_APPKEY`（与 env 对应）、`XPAY_PRODUCT_ID`、`XPAY_PRODUCT_ID_IOS`
+2. 云函数 `createOrder / payCallback / checkOrder` 配置环境变量（**全部必填**，缺任一项即视为未配置、拒绝下单）：`WX_APPID`、`WX_APPSECRET`、`XPAY_ENV`（1 沙箱 / 0 正式，不再有默认值）、`XPAY_OFFER_ID`、`XPAY_APPKEY`（与 env 对应）、`XPAY_PRODUCT_ID`、`XPAY_PRODUCT_ID_IOS`；各函数 `config.json` 已设超时 20s
 3. 云开发「消息推送」订阅 `xpay_goods_deliver_notify` → `payCallback`
 4. 沙箱联调：安卓 + iOS 真机各跑通 下单 → 支付 → 推送 → 查单 → 核销 → 退款；签名与字段逐项对照官方文档（`cloud/shared/xpay.js` 头注释）
-5. 集合权限：全部改为「仅创建者可读写」（控制台默认值可能允许所有用户读）；建索引 `reports: openid+createdAt`、`orders: openid+status`、`events: event+createdAt / expireAt`
-6. `src/data/agreements.ts` 的 `OPERATOR_NAME` 替换为营业执照主体全称
+5. 集合权限：5 个集合全部设为**自定义安全规则 `{"read": false, "write": false}`**（客户端从不直连数据库；「仅创建者可读写」仍允许客户端直写，可伪造已支付订单——三轮盲审 N2）；建索引 `reports: openid+createdAt`、`orders: openid+status`、`events: event+createdAt / expireAt`
+6. `src/data/agreements.ts` 的 `OPERATOR_NAME` 替换为营业执照主体全称、隐私政策「生效日期」填上线日期——**占位符未替换时生产构建直接失败**；仅本地验证编译可 `CT_ALLOW_PLACEHOLDER=1 npm run build:weapp`，该产物不得上传
+9. iOS 虚拟支付前置：后台配置「小程序简称」；用户侧要求 iOS 15+、微信 8.0.68+、中国大陆 App Store 账户、价格 ≥ ¥1
+10. `src/config.ts` 的 `CLOUD_ENV` 必填（体验版/正式版为空直接报错）
 7. 平台后台《用户隐私保护指引》与 `agreements.ts` 隐私政策口径一致
 8. `counters` 集合可预建 `_id: 'reports'` 文档（未建时 submitTest 会自动创建）
 
 ## 文档
 
-设计记录（10 模块 + 决策日志 D1-D24 + 盲审裁决）见 vault：`20-知识/项目记录/career-test/`；
+设计记录（10 模块 + 决策日志 D1-D35 + 三轮盲审报告）见 vault：`20-知识/项目记录/career-test/`；
 代码侧题库工程规范见 `20-知识/项目记录/career-test/13-题库工程规范-代码侧.md`。

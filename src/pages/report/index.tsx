@@ -60,8 +60,15 @@ export default function Report() {
         Taro.showToast({ title: '已收到', icon: 'success' })
       })
       .catch((e: Error) => {
-        const risky = e && (e.message === 'CONTENT_RISKY' || e.message === 'CONTENT_CHECK_FAILED')
-        Taro.showToast({ title: risky ? '文字未通过检测，请修改后再提交' : '提交失败，请重试', icon: 'none' })
+        const msg = e && e.message
+        Taro.showToast({
+          title: msg === 'CONTENT_RISKY'
+            ? '文字未通过检测，请修改后再提交'
+            : msg === 'CONTENT_CHECK_FAILED'
+              ? '检测服务暂不可用，可先清空文字只提交选项'
+              : '提交失败，请重试',
+          icon: 'none'
+        })
       })
       .finally(() => setSending(false))
   }

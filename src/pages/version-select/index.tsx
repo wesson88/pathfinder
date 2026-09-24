@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { formatPrice, proPriceFen } from '../../config'
+import { currentPlatform, formatPrice, proPriceFen } from '../../config'
 import { PAY_COPY } from '../../data/copy'
 import { checkOrder } from '../../utils/pay'
 import { track } from '../../utils/track'
@@ -13,7 +13,7 @@ export default function VersionSelect() {
   useDidShow(() => track('version_select_view'))
 
   const goQuiz = (version: Version) => {
-    track('select_version', { version })
+    if (version === 'fun') track('select_version', { version })
     Taro.redirectTo({ url: `/pages/quiz/index?version=${version}` })
   }
 
@@ -25,6 +25,7 @@ export default function VersionSelect() {
    */
   const onPro = () => {
     if (checking) return
+    track('select_version', { version: 'pro' })
     setChecking(true)
     checkOrder()
       .then(r => {
@@ -36,7 +37,9 @@ export default function VersionSelect() {
           // 04 §2 铁律 4：已支付超 48h 未使用
           Taro.showModal({
             title: '你有一笔未使用的 PRO',
-            content: '你已付费但还没有生成报告，可以直接开始作答；如不想使用，可在首页「联系客服」申请退款。',
+            content: currentPlatform() === 'ios'
+              ? '你已付费但还没有生成报告，可以直接开始作答；如需退款，请通过 App Store 向苹果申请。'
+              : '你已付费但还没有生成报告，可以直接开始作答；如不想使用，可在首页「联系客服」申请退款。',
             confirmText: '开始作答',
             success: res => res.confirm && goQuiz('pro')
           })

@@ -6,7 +6,8 @@ const _ = db.command
 const EXPECTED = { fun: 6, pro: 12 }
 const MAX_RETRY = 3 // 事务冲突重试上限（03 §5）
 const DAY = 24 * 3600 * 1000
-const RATE_LIMIT = 10 // 单 openid 24h 内交卷上限（防脚本刷报告数/「N 人已测」）
+const RATE_LIMIT = 10 // 单 openid 24h 内趣味版交卷上限（防脚本刷报告数）；PRO 有付费订单兜底，不受限（三轮盲审 N5）
+const MAX_RESULT_BYTES = 8000 // result 序列化上限（三轮盲审技术 M5）
 const DIMS = ['insight', 'creativity', 'action', 'collab', 'stability']
 
 // 题库合法选项映射（qid → 选项 key 列表）。与 src/data/questions-* 同步维护，
@@ -57,6 +58,7 @@ function validateAnswers(version, answers) {
 /** result 结构校验：计分仍由前端 computeResult 产出（「前端厚」架构取舍），云端拦截脏数据与明显伪造 */
 function validateResult(version, result) {
   if (!result || typeof result !== 'object' || result.version !== version) return false
+  if (JSON.stringify(result).length > MAX_RESULT_BYTES) return false
   if (typeof result.archetypeName !== 'string' || !result.archetypeName || result.archetypeName.length > 60) return false
   if (!result.scores || DIMS.some(d => {
     const v = result.scores[d]
@@ -65,6 +67,9 @@ function validateResult(version, result) {
   if (!Array.isArray(result.topDims) || result.topDims.length !== DIMS.length) return false
   return result.topDims.every(d => DIMS.includes(d))
 }
+
+/** 权益有效的 paid 单：虚拟支付通道 + 有权威查单原文（客户端伪造的文档没有 queryRaw） */
+const validPaid = o => o && o.channel === 'xpay' && typeof o.queryRaw === 'string' && o.queryRaw.length > 0
 
 /** 报告计数：事务外 best-effort；计数文档不存在时创建（失败不影响交卷） */
 async function bumpCounter() {
@@ -111,23 +116,29 @@ exports.main = async (event) => {
   const dup = await existingReport(sessionId, OPENID)
   if (dup) return dup
 
-  // 频控：计数失败不拦截交卷
-  try {
-    const recent = await db.collection('reports')
-      .where({ openid: OPENID, createdAt: _.gt(Date.now() - DAY) })
-      .count()
-    if (recent.total >= RATE_LIMIT) return { ok: false, error: 'RATE_LIMITED' }
-  } catch (e) { /* ignore */ }
+  // 答卷只保留 {key, ms}，丢弃任何附加字段
+  const cleanAnswers = {}
+  for (const [qid, a] of Object.entries(answers)) cleanAnswers[qid] = { key: a.key, ms: a.ms }
 
-  // PRO：找最早一笔已支付未核销订单
+  // 频控只针对趣味版；计数失败不拦截交卷
+  if (version === 'fun') {
+    try {
+      const recent = await db.collection('reports')
+        .where({ openid: OPENID, version: 'fun', createdAt: _.gt(Date.now() - DAY) })
+        .count()
+      if (recent.total >= RATE_LIMIT) return { ok: false, error: 'RATE_LIMITED' }
+    } catch (e) { /* ignore */ }
+  }
+
+  // PRO：找最早一笔有效的已支付未核销订单（虚拟支付通道 + 有权威查单原文，挡住伪造文档，三轮盲审 N2）
   let order = null
   if (version === 'pro') {
     const q = await db.collection('orders')
-      .where({ openid: OPENID, status: 'paid' })
+      .where({ openid: OPENID, status: 'paid', channel: 'xpay' })
       .orderBy('createdAt', 'asc')
-      .limit(1)
+      .limit(5)
       .get()
-    order = q.data && q.data[0]
+    order = (q.data || []).find(validPaid)
     if (!order) return { ok: false, error: 'NO_PAID_ORDER' }
   }
 
@@ -139,13 +150,13 @@ exports.main = async (event) => {
           // 事务内按 docId 复核仍为 paid（条件消费，防并发双花）
           const o = await t.collection('orders').doc(order._id).get()
           const od = Array.isArray(o.data) ? o.data[0] : o.data
-          if (!od || od.status !== 'paid') throw new Error('ORDER_CONFLICT')
+          if (!od || od.status !== 'paid' || !validPaid(od)) throw new Error('ORDER_CONFLICT')
           await t.collection('orders').doc(order._id).update({
             data: { status: 'consumed', consumedAt: now, reportId: sessionId }
           })
         }
         await t.collection('reports').add({
-          data: { _id: sessionId, openid: OPENID, version, result, answers, createdAt: now, updatedAt: now }
+          data: { _id: sessionId, openid: OPENID, version, result, answers: cleanAnswers, createdAt: now, updatedAt: now }
         })
       })
       await bumpCounter()
@@ -158,11 +169,11 @@ exports.main = async (event) => {
         if (again) return again
         // 该订单被他端核销：换下一笔 paid 订单重试（排除刚冲突的这笔，防同单死循环）
         const q2 = await db.collection('orders')
-          .where({ openid: OPENID, status: 'paid' })
+          .where({ openid: OPENID, status: 'paid', channel: 'xpay' })
           .orderBy('createdAt', 'asc')
-          .limit(2)
+          .limit(5)
           .get()
-        const next = (q2.data || []).find(o => o._id !== (order && order._id))
+        const next = (q2.data || []).find(o => validPaid(o) && o._id !== (order && order._id))
         if (!next) return { ok: false, error: 'NO_PAID_ORDER' }
         order = next
         continue

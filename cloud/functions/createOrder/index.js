@@ -3,12 +3,20 @@ const cloud = require('wx-server-sdk')
 const xpay = require('./xpay')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const _ = db.command
 
+const RECENT = 2 * 3600 * 1000 // 下单前复核的 created 单时间窗
+
+/**
+ * platform 来自客户端，不可信（三轮盲审文档 M1）：只用于选道具与展示价；
+ * iOS 端若伪报为安卓，拉起时道具/价格与平台配置不符会被平台拒绝（沙箱待验证）。
+ */
 const PLATFORMS = ['android', 'ios', 'windows', 'mac', 'devtools', 'ohos']
 
 /**
  * 下单（D25 全终端小程序虚拟支付，04 §3）：
- * 1. 服务端防重复收款：已有 paid 未核销订单 → 拒绝下单（04 §2 铁律 1 的云端兜底）
+ * 1. 服务端防重复收款：已有 paid 未核销订单 → 拒绝下单；近 2h 的 created 单先权威查单，
+ *    已支付则补写并拒绝下单，查单异常也拒绝（三轮盲审 N3：支付 fail 回调先到但实际已扣款时的二次扣款）
  * 2. wx.login code 换 session_key，openid 须与云调用上下文一致
  * 3. 落 orders(created)，单号高熵（二轮盲审技术 H2：原「毫秒+3 位随机」可碰撞）
  * 4. 构造 signData 并签名，返回前端 wx.requestVirtualPayment 参数
@@ -23,10 +31,32 @@ exports.main = async (event) => {
   const platform = PLATFORMS.includes(rawPlatform) ? rawPlatform : 'android'
 
   try {
-    const paid = await db.collection('orders').where({ openid: OPENID, status: 'paid' }).count()
+    const paid = await db.collection('orders').where({ openid: OPENID, status: 'paid', channel: 'xpay' }).count()
     if (paid.total > 0) return { ok: false, error: 'HAS_PAID_UNUSED' }
+    const recent = await db.collection('orders')
+      .where({ openid: OPENID, status: 'created', channel: 'xpay', createdAt: _.gt(Date.now() - RECENT) })
+      .limit(3)
+      .get()
+    for (const o of recent.data || []) {
+      let v
+      try {
+        v = await xpay.queryOrder(OPENID, o.outTradeNo)
+      } catch (err) {
+        // 平台明确回了错误码（如从未拉起支付的单不存在）= 已处理请求且非已支付，放行；
+        // 网络/超时等状态不明 → 抛出，拒绝下单
+        if (err && err.errcode != null) continue
+        throw err
+      }
+      if (v.paid) {
+        await db.collection('orders')
+          .where({ _id: o._id, openid: OPENID, status: 'created' })
+          .update({ data: { status: 'paid', paidAt: Date.now(), queryRaw: v.raw } })
+        await xpay.notifyProvideGoods(o.outTradeNo).catch(() => {})
+        return { ok: false, error: 'HAS_PAID_UNUSED' }
+      }
+    }
   } catch (e) {
-    return { ok: false, error: 'ORDER_FAILED' }
+    return { ok: false, error: 'CHECK_FAILED' }
   }
 
   let sessionKey

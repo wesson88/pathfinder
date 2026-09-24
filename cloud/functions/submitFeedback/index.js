@@ -34,13 +34,15 @@ exports.main = async (event) => {
     }
   }
 
+  const exists = await db.collection('feedback').doc(reportId).get().then(() => true).catch(() => false)
+  if (exists) return { ok: true, duplicate: true }
   try {
     await db.collection('feedback').add({
       data: { _id: reportId, openid: OPENID, reportId, accuracy, content: text, createdAt: Date.now() }
     })
     return { ok: true }
   } catch (e) {
-    // docId 已存在 = 该报告已反馈过
-    return { ok: true, duplicate: true }
+    // 只有「已存在」算重复；其余写入失败如实返回（三轮盲审技术 L6）
+    return { ok: false, error: 'FEEDBACK_FAILED' }
   }
 }

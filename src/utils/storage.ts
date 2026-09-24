@@ -122,11 +122,20 @@ export const setMockProUnlocked = (v: boolean) => {
 
 /* ---------------- 隐私告知同意（09 §5：同意前不采集行为数据） ---------------- */
 
-export const hasConsent = () => get<boolean>(KEY_CONSENT, false)
+export type ConsentState = 'granted' | 'declined' | null
 
-export const setConsent = () => {
+/** 旧版本存的 true 视为 granted */
+export const getConsent = (): ConsentState => {
+  const v = get<string | boolean | null>(KEY_CONSENT, null)
+  return v === true || v === 'granted' ? 'granted' : v === 'declined' ? 'declined' : null
+}
+
+/** 只有明确同意才采集使用分析（D33：可拒绝、可随时撤回） */
+export const hasConsent = () => getConsent() === 'granted'
+
+export const setConsent = (state: 'granted' | 'declined') => {
   try {
-    Taro.setStorageSync(KEY_CONSENT, true)
+    Taro.setStorageSync(KEY_CONSENT, state)
   } catch { /* ignore */ }
 }
 

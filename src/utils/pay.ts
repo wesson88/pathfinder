@@ -46,6 +46,9 @@ export type PayOutcome = 'paid' | 'pending' | 'canceled' | 'failed' | 'has_paid'
  * mock 模式下 createOrder 直接置已支付，payParams 为 null。
  */
 export async function payPro(): Promise<PayOutcome> {
+  // 每次下单前先查单（三轮盲审 N3）：上一次支付 fail 回调先到但实际已扣款时，直接用那笔
+  const pre = await checkOrder()
+  if (pre.hasPaidUnused) return 'has_paid'
   const { code } = isMockMode() ? { code: 'mock' } : await Taro.login()
   let order: { outTradeNo: string; payParams: VirtualPayParams | null }
   try {

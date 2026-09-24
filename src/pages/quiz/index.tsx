@@ -101,12 +101,15 @@ export default function Quiz() {
     })
   }
 
+  // 防重入用 ref：state 在同一帧内的双击拿不到最新值（三轮盲审技术 L8）
+  const submittingRef = useRef(false)
   const submit = (s: QuizSession) => {
-    if (submitting) return
+    if (submittingRef.current) return
     if (!isSessionComplete(s)) {
       Taro.showToast({ title: '还有题目未作答', icon: 'none' })
       return
     }
+    submittingRef.current = true
     setSubmitting(true)
     setSubmitError(false)
 
@@ -136,6 +139,16 @@ export default function Quiz() {
         })
         .catch((e: Error) => {
           setSubmitting(false)
+          submittingRef.current = false
+          track('quiz_submit', { version, ok: false, error: e?.message })
+          if (e && e.message === 'RATE_LIMITED') {
+            Taro.showModal({
+              title: '今天测得有点多啦',
+              content: '趣味版 24 小时内最多生成 10 份报告，你的作答已保存在本机，明天再来生成即可。',
+              showCancel: false
+            })
+            return
+          }
           if (e && e.message === 'NO_PAID_ORDER') {
             // 订单异常（他端已核销/未支付）：引导重新解锁
             Taro.showModal({
@@ -147,9 +160,9 @@ export default function Quiz() {
             return
           }
           setSubmitError(true)
-          track('quiz_submit', { version, ok: false, error: e?.message })
         })
     } catch {
+      submittingRef.current = false
       setSubmitting(false)
       setSubmitError(true)
     }
@@ -165,7 +178,6 @@ export default function Quiz() {
     }
     setSession(updated)
     persist(updated)
-    track('quiz_answer', { version, qid: q.id, key: optKey, ms: answer.ms })
 
     // 答完最后一题不自动交卷：停在最后一题显示「提交并生成报告」，可回看修改（03 §4）
     if (index < questions.length - 1) {

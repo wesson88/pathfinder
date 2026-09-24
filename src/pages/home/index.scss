@@ -126,3 +126,15 @@
   margin-top: 32px;
   height: 88px;
 }
+
+.consent-decline {
+  margin-top: 16px;
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 44px;
+  border: 2px solid var(--c-line);
+  font-size: 28px;
+  color: var(--c-text);
+}

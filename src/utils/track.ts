@@ -14,7 +14,6 @@ export type TrackEvent =
   | 'version_select_view'
   | 'select_version'
   | 'quiz_start'
-  | 'quiz_answer'
   | 'quiz_abandon'
   | 'quiz_submit'
   | 'report_view'

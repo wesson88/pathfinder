@@ -22,14 +22,17 @@ if (USE_MOCK && process.env.NODE_ENV === 'production') {
  * 运行时第二道防线（二轮盲审技术 M6）：dev:weapp 产物默认 mock=true，若被误上传为体验版/正式版，
  * 构建期检查拦不住——按小程序运行环境再拦一次，体验版/正式版里 mock 态直接抛错。
  */
-if (USE_MOCK) {
-  let envVersion = 'develop'
-  try {
-    envVersion = Taro.getAccountInfoSync().miniProgram.envVersion
-  } catch { /* 非小程序环境（如单测）忽略 */ }
-  if (envVersion === 'release' || envVersion === 'trial') {
-    throw new Error('[career-test] 体验版/正式版禁止运行 mock 构建产物')
-  }
+let envVersion = 'develop'
+try {
+  envVersion = Taro.getAccountInfoSync().miniProgram.envVersion
+} catch { /* 非小程序环境（如单测）忽略 */ }
+const isReleaseLike = envVersion === 'release' || envVersion === 'trial'
+if (USE_MOCK && isReleaseLike) {
+  throw new Error('[career-test] 体验版/正式版禁止运行 mock 构建产物')
+}
+// 体验版/正式版必须显式指定云环境，防多环境下连到默认环境（三轮盲审技术 L5）
+if (!USE_MOCK && isReleaseLike && !CLOUD_ENV) {
+  throw new Error('[career-test] 体验版/正式版未配置 CLOUD_ENV')
 }
 
 /**

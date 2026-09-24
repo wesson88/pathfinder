@@ -10,11 +10,11 @@
  *
  * 环境变量（云函数配置，勿入仓库）：
  *   WX_APPID / WX_APPSECRET          小程序凭据（换 session_key、access_token）
- *   XPAY_ENV                         0 正式 / 1 沙箱
+ *   XPAY_ENV                         0 正式 / 1 沙箱（必填：缺省不再默认沙箱，三轮盲审 N8）
  *   XPAY_OFFER_ID                    虚拟支付 OfferId
  *   XPAY_APPKEY                      与 XPAY_ENV 对应的 AppKey（正式/沙箱各一）
  *   XPAY_PRODUCT_ID                  PRO 道具 ID（安卓/PC）
- *   XPAY_PRODUCT_ID_IOS              PRO 道具 ID（iOS 档位价；缺省同上）
+ *   XPAY_PRODUCT_ID_IOS              PRO 道具 ID（iOS 档位价；必填，不回退安卓道具）
  */
 const crypto = require('crypto')
 const https = require('https')
@@ -22,18 +22,18 @@ const https = require('https')
 const cfg = {
   appid: process.env.WX_APPID || '',
   secret: process.env.WX_APPSECRET || '',
-  env: Number(process.env.XPAY_ENV || 1),
+  env: process.env.XPAY_ENV === '0' ? 0 : process.env.XPAY_ENV === '1' ? 1 : null,
   offerId: process.env.XPAY_OFFER_ID || '',
   appKey: process.env.XPAY_APPKEY || '',
   productId: process.env.XPAY_PRODUCT_ID || '',
-  productIdIos: process.env.XPAY_PRODUCT_ID_IOS || process.env.XPAY_PRODUCT_ID || ''
+  productIdIos: process.env.XPAY_PRODUCT_ID_IOS || ''
 }
 
 /** 价格唯一事实源（分）：安卓/PC ¥0.99，iOS 苹果档位 ¥1（04 §3）。前端传入金额一律不采信 */
 const PRICE = { default: 99, ios: 100 }
 
 const isConfigured = () =>
-  !!(cfg.appid && cfg.secret && cfg.offerId && cfg.appKey && cfg.productId)
+  !!(cfg.appid && cfg.secret && cfg.offerId && cfg.appKey && cfg.productId && cfg.productIdIos && cfg.env !== null)
 
 const hmac = (key, text) => crypto.createHmac('sha256', key).update(text).digest('hex')
 
@@ -42,7 +42,7 @@ function request(method, url, body) {
     const payload = body == null ? null : typeof body === 'string' ? body : JSON.stringify(body)
     const req = https.request(url, {
       method,
-      timeout: 5000,
+      timeout: 2500, // 须小于云函数超时（config.json 20s），留出多次调用余量
       headers: payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}
     }, res => {
       let data = ''
@@ -102,12 +102,23 @@ function buildPayParams({ outTradeNo, platform, sessionKey }) {
   }
 }
 
-async function serverApi(uri, body) {
+const TOKEN_INVALID = [40001, 42001]
+
+async function serverApi(uri, body, retried = false) {
   const text = JSON.stringify(body)
   const token = await accessToken()
   const url = `https://api.weixin.qq.com${uri}?access_token=${token}&pay_sig=${hmac(cfg.appKey, `${uri}&${text}`)}`
   const r = await request('POST', url, text)
-  if (!r || r.errcode !== 0) throw new Error(`XPAY_API_${r ? r.errcode : 'EMPTY'}`)
+  // token 失效：清缓存重试一次（三轮盲审技术 L1）
+  if (r && TOKEN_INVALID.includes(r.errcode) && !retried) {
+    tokenCache = { value: '', expireAt: 0 }
+    return serverApi(uri, body, true)
+  }
+  if (!r || r.errcode !== 0) {
+    const err = new Error(`XPAY_API_${r ? r.errcode : 'EMPTY'}`)
+    err.errcode = r ? r.errcode : null
+    throw err
+  }
   return r
 }
 
@@ -117,8 +128,10 @@ async function serverApi(uri, body) {
  */
 const PAID_STATES = [2, 3, 4]
 const CLOSED_STATES = [6]
+/** 已退款（含 iOS 用户向苹果申请的退款）：权益须回收（三轮盲审 N7） */
+const REFUNDED_STATES = [5, 8]
 
-/** 权威查单：返回 { paid, closed, raw }；raw 已剔除 openid（05 §2 queryRaw 口径） */
+/** 权威查单：返回 { paid, closed, refunded, raw }；raw 已剔除 openid（05 §2 queryRaw 口径） */
 async function queryOrder(openid, outTradeNo) {
   const r = await serverApi('/xpay/query_order', { openid, env: cfg.env, order_id: outTradeNo })
   const order = r.order || {}
@@ -126,6 +139,7 @@ async function queryOrder(openid, outTradeNo) {
   return {
     paid: PAID_STATES.includes(order.status),
     closed: CLOSED_STATES.includes(order.status),
+    refunded: REFUNDED_STATES.includes(order.status),
     raw: JSON.stringify(raw).slice(0, 2000)
   }
 }

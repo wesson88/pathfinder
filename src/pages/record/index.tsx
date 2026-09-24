@@ -18,6 +18,10 @@ const VERSION_LABEL: Record<Version, string> = { fun: '趣味版', pro: 'PRO' }
 
 export default function Record() {
   const [reports, setReports] = useState<ReportItem[]>([])
+  // 云端分页（三轮盲审 N10：换设备后不止能取回最近 20 份）
+  const [cloudSkip, setCloudSkip] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [sessions, setSessions] = useState<QuizSession[]>([])
 
   useDidShow(() => {
@@ -31,12 +35,29 @@ export default function Record() {
     setSessions(list.map(x => x.session))
 
     // 云端刷新兜底（本地缓存优先展示，静默合并）
-    callCloud<{ reports: ReportItem[] }>('getReports')
+    callCloud<{ reports: ReportItem[]; hasMore?: boolean }>('getReports')
       .then(r => {
         if (r.reports?.length) setReports(mergeCloudReports(r.reports))
+        setCloudSkip(r.reports?.length || 0)
+        setHasMore(!!r.hasMore)
       })
       .catch(() => { /* 离线可用 */ })
   })
+
+  const loadMore = () => {
+    if (loadingMore) return
+    setLoadingMore(true)
+    callCloud<{ reports: ReportItem[]; hasMore?: boolean }>('getReports', { skip: cloudSkip })
+      .then(r => {
+        const more = r.reports || []
+        // 超出本地缓存上限的旧报告只在本页展示，不写缓存
+        setReports(list => [...list, ...more.filter(x => !list.some(y => y._id === x._id))])
+        setCloudSkip(cloudSkip + more.length)
+        setHasMore(!!r.hasMore)
+      })
+      .catch(() => Taro.showToast({ title: '加载失败，请重试', icon: 'none' }))
+      .finally(() => setLoadingMore(false))
+  }
 
   const openReport = (id: string) => Taro.navigateTo({ url: `/pages/report/index?id=${id}` })
 
@@ -105,6 +126,9 @@ export default function Record() {
               <view className='rec-item-arrow'>›</view>
             </view>
           ))}
+          {hasMore && (
+            <view className='rec-more' onClick={loadMore}>{loadingMore ? '加载中…' : '加载更早的报告'}</view>
+          )}
         </view>
       )}
     </view>

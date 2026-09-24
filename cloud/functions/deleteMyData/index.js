@@ -11,8 +11,9 @@ const COLLECTION_NOT_EXIST = -502005
  * 「清除我的数据」（D15，05 §4）：
  * - 逐集合删除 reports / feedback / events（及历史遗留 sessions），逐项收集结果；任一失败返回 ok:false，
  *   前端提示可重试（操作幂等）。二轮盲审 X6：原实现吞掉异常照样返回 ok，界面还先于云端提示「已清除」
- * - orders：paid 未核销订单保留归属（保障用户已付费的权益，可继续使用或申请退款）；
- *   其余订单 openid 替换为随机不可逆标识。所有订单清空查单原文 queryRaw 与历史字段 callbackRaw
+ * - orders：paid 未核销与 created（可能已付款待落账）订单保留归属与查单原文——
+ *   匿名化 created 单会让之后的查单用假 openid 永远失败、扣款无权益（三轮盲审 N6）；
+ *   consumed / closed / refunded 订单 openid 替换为随机不可逆标识并清空查单原文
  * - 报告删除后回减计数
  * - 删除完成后不写任何带 openid 的事件
  */
@@ -41,10 +42,7 @@ exports.main = async () => {
 
   try {
     await db.collection('orders')
-      .where({ openid: OPENID, status: 'paid' })
-      .update({ data: { queryRaw: '', callbackRaw: _.remove() } })
-    await db.collection('orders')
-      .where({ openid: OPENID, status: _.neq('paid') })
+      .where({ openid: OPENID, status: _.in(['consumed', 'closed', 'refunded']) })
       .update({
         data: {
           openid: `deleted-${crypto.randomBytes(12).toString('hex')}`,

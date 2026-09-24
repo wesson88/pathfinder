@@ -4,7 +4,6 @@ import { formatPrice, proPriceFen } from '../../config'
 import AgreementModal from '../../components/AgreementModal'
 import { AGREEMENT_LINKS, AgreementKey, CHECKBOX_TEXT } from '../../data/agreements'
 import { PAY_COPY } from '../../data/copy'
-import { isMockMode } from '../../utils/cloud'
 import { checkOrder, payPro } from '../../utils/pay'
 import { track } from '../../utils/track'
 import './index.scss'
@@ -55,7 +54,7 @@ export default function PayConfirm() {
     payPro()
       .then(outcome => {
         if (outcome === 'paid' || outcome === 'has_paid') {
-          track('pay_success', { mock: isMockMode() })
+          track('pay_success')
           goQuiz()
           return
         }
@@ -72,10 +71,11 @@ export default function PayConfirm() {
           success: () => Taro.navigateBack().catch(() => Taro.switchTab({ url: '/pages/home/index' }))
         })
       })
-      .catch(() => {
+      .catch((e: Error) => {
         setPaying(false)
-        track('pay_fail', { reason: 'order' })
-        Taro.showToast({ title: '下单失败，请重试', icon: 'none' })
+        const checking = e && e.message === 'CHECK_FAILED'
+        track('pay_fail', { reason: checking ? 'check' : 'order' })
+        Taro.showToast({ title: checking ? '正在确认上一笔订单，请稍后再试' : '下单失败，请重试', icon: 'none' })
       })
   }
 
