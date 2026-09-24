@@ -1,5 +1,6 @@
 import Taro from '@tarojs/taro'
 import { callCloud } from './cloud'
+import { hasConsent } from './storage'
 
 /**
  * 埋点统一出口（M10 / D22）：轻量自建，fire-and-forget，失败静默，绝不阻塞用户操作。
@@ -23,8 +24,14 @@ export type TrackEvent =
   | 'record_view'
   | 'feedback_submit'
   | 'data_delete'
+  | 'contact_tap'
+  | 'report_feedback'
+  | 'retake_tap'
+  | 'share_tap'
 
 export function track(event: TrackEvent, props: Record<string, any> = {}) {
+  // 知情先于采集（09 §5）：用户同意隐私告知前不上报任何行为数据
+  if (!hasConsent()) return
   const p: Record<string, any> = { ...props }
   try {
     if (Taro.getCurrentInstance().router?.path) {

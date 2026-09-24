@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
+import { Button, Textarea } from '@tarojs/components'
+import FooterLinks from '../../components/FooterLinks'
 import RadarChart from '../../components/RadarChart'
 import {
   DIM_EXPLAIN,
   DIM_LEVEL,
+  FEEDBACK_COPY,
   legacyArchetypeTier,
   legacyCareerTier,
   levelOf,
   LEVEL_LABEL,
   MATCH_FOOTNOTE,
+  QC_NOTICE,
   RADAR_NOTE,
+  SHARE_COPY,
   UPSELL_COPY,
   upsellDesc
 } from '../../data/copy'
@@ -29,16 +34,42 @@ export default function Report() {
   const [report, setReport] = useState<ReportItem | null>(() => findCachedReport(id))
   const [loaded, setLoaded] = useState(!!report)
   const [explainDim, setExplainDim] = useState<DimKey | null>(null)
+  const [accuracy, setAccuracy] = useState<'good' | 'bad' | null>(null)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [feedbackSent, setFeedbackSent] = useState(false)
+  const [sending, setSending] = useState(false)
   const trackedRef = useRef(false)
 
+  // 分享标题不带任何百分比，落地一律回首页（08 §2）
   useShareAppMessage(() => {
-    track('report_share', { reportId: id })
+    track('share_tap', { version: report?.result.version })
     const r = report?.result
     const title = r
-      ? `我的${r.version === 'pro' ? '天赋原型' : '趣味天赋'}是「${r.archetypeName}」，来测测你的？`
-      : '天赋星球｜找到让你闪闪发光的职业'
-    return { title, path: '/pages/home/index' }
+      ? r.version === 'pro' ? SHARE_COPY.pro(r.archetypeName) : SHARE_COPY.fun(r.archetypeName)
+      : SHARE_COPY.homeTitle
+    return { title, path: '/pages/home/index', imageUrl: '/assets/share-card.png' }
   })
+
+  const sendFeedback = () => {
+    if (!accuracy || sending || feedbackSent) return
+    setSending(true)
+    callCloud('submitFeedback', { reportId: id, accuracy, content: feedbackText.trim() })
+      .then(() => {
+        setFeedbackSent(true)
+        track('report_feedback', { accuracy, hasText: !!feedbackText.trim() })
+        Taro.showToast({ title: '已收到', icon: 'success' })
+      })
+      .catch((e: Error) => {
+        const risky = e && (e.message === 'CONTENT_RISKY' || e.message === 'CONTENT_CHECK_FAILED')
+        Taro.showToast({ title: risky ? '文字未通过检测，请修改后再提交' : '提交失败，请重试', icon: 'none' })
+      })
+      .finally(() => setSending(false))
+  }
+
+  const retake = () => {
+    track('retake_tap', { version: report?.result.version })
+    Taro.navigateTo({ url: '/pages/version-select/index' })
+  }
 
   useEffect(() => {
     if (report && !trackedRef.current) {
@@ -50,7 +81,8 @@ export default function Report() {
   // 本地缓存未命中 → 云端兜底（报告页秒开策略，M6）
   useEffect(() => {
     if (loaded) return
-    callCloud<{ reports: ReportItem[] }>('getReports')
+    // 按 id 精确取，不受列表条数限制
+    callCloud<{ reports: ReportItem[] }>('getReports', { id })
       .then(r => {
         mergeCloudReports(r.reports || [])
         const hit = findCachedReport(id)
@@ -149,6 +181,10 @@ export default function Report() {
         </view>
       )}
 
+      {r.qc && (r.qc.fastRatio > 0.5 || r.qc.sameKeyRatio > 0.9) && (
+        <view className='card rep-qc'>{QC_NOTICE}</view>
+      )}
+
       {upsellVisible && (
         <view className='card rep-upsell' onClick={() => Taro.navigateTo({ url: '/pages/pay-confirm/index' })}>
           <view className='upsell-title'>{UPSELL_COPY.title}</view>
@@ -157,7 +193,46 @@ export default function Report() {
         </view>
       )}
 
+      {!id.startsWith('local-') && (
+        <view className='card rep-feedback'>
+          <view className='section-title'>{FEEDBACK_COPY.title}</view>
+          {feedbackSent ? (
+            <view className='fb-thanks'>{FEEDBACK_COPY.thanks}</view>
+          ) : (
+            <view>
+              <view className='fb-choices'>
+                {(['good', 'bad'] as const).map(a => (
+                  <view key={a} className={`fb-choice ${accuracy === a ? 'on' : ''}`} onClick={() => setAccuracy(a)}>
+                    {FEEDBACK_COPY[a]}
+                  </view>
+                ))}
+              </view>
+              {accuracy && (
+                <view>
+                  <Textarea
+                    className='fb-input'
+                    maxlength={200}
+                    value={feedbackText}
+                    placeholder={FEEDBACK_COPY.placeholder}
+                    onInput={e => setFeedbackText(e.detail.value)}
+                  />
+                  <view className={`btn-primary fb-submit ${sending ? 'disabled' : ''}`} onClick={sendFeedback}>
+                    {FEEDBACK_COPY.submit}
+                  </view>
+                </view>
+              )}
+            </view>
+          )}
+        </view>
+      )}
+
+      <view className='rep-actions'>
+        <view className='btn-ghost rep-action' onClick={retake}>再测一次</view>
+        <Button className='btn-primary rep-action rep-share' openType='share'>分享结果</Button>
+      </view>
+
       <view className='disclaimer rep-disclaimer'>{REPORT_DISCLAIMER}</view>
+      <FooterLinks source='report' />
 
       {explainDim && (
         <view className='explain-mask' onClick={() => setExplainDim(null)}>

@@ -141,8 +141,8 @@ export default function Quiz() {
           if (e && e.message === 'NO_PAID_ORDER') {
             // 订单异常（他端已核销/未支付）：引导重新解锁
             Taro.showModal({
-              title: '需要解锁 PRO',
-              content: '未找到可用的已支付订单，请先完成解锁',
+              title: '需要付费生成 PRO 报告',
+              content: '没有找到可用的已支付订单（每次付费生成 1 份 PRO 报告），请先完成支付；你的作答进度会保留',
               showCancel: false,
               success: () => Taro.redirectTo({ url: '/pages/pay-confirm/index' })
             })

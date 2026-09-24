@@ -2,25 +2,45 @@ const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 
-/** 反馈提交（M7）：「不太准」等用户声音落库，人工归类后驱动题库迭代 */
+const MAX_LEN = 200
+
+/**
+ * 报告页反馈（M7，07 §2）：还挺准 / 不太准 + 选填感受。
+ * - 文字入库前过 msgSecCheck（UGC 合规硬要求；config.json 声明 openapi 权限）
+ * - 不收集联系方式（需要回复的诉求走客服会话）
+ * - 每份报告限反馈一次：docId = reportId，且报告须归属本人
+ */
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
-  const { content, contact, reportId } = event || {}
+  const { reportId, accuracy, content } = event || {}
   if (!OPENID) return { ok: false, error: 'NO_OPENID' }
-  if (!content || !String(content).trim()) return { ok: false, error: 'BAD_REQUEST' }
+  if (typeof reportId !== 'string' || !reportId || !['good', 'bad'].includes(accuracy)) {
+    return { ok: false, error: 'BAD_REQUEST' }
+  }
+  const text = typeof content === 'string' ? content.trim().slice(0, MAX_LEN) : ''
+
+  const report = await db.collection('reports').doc(reportId).get()
+    .then(d => (Array.isArray(d.data) ? d.data[0] : d.data))
+    .catch(() => null)
+  if (!report || report.openid !== OPENID) return { ok: false, error: 'REPORT_NOT_FOUND' }
+
+  if (text) {
+    try {
+      const r = await cloud.openapi.security.msgSecCheck({ openid: OPENID, scene: 2, version: 2, content: text })
+      if (!r || !r.result || r.result.suggest !== 'pass') return { ok: false, error: 'CONTENT_RISKY' }
+    } catch (e) {
+      // 检测服务异常时不放行文字，只保留快捷反馈
+      return { ok: false, error: 'CONTENT_CHECK_FAILED' }
+    }
+  }
 
   try {
     await db.collection('feedback').add({
-      data: {
-        openid: OPENID,
-        content: String(content).slice(0, 1000),
-        contact: contact ? String(contact).slice(0, 100) : '',
-        reportId: reportId ? String(reportId) : '',
-        createdAt: Date.now()
-      }
+      data: { _id: reportId, openid: OPENID, reportId, accuracy, content: text, createdAt: Date.now() }
     })
     return { ok: true }
   } catch (e) {
-    return { ok: false, error: 'FEEDBACK_FAILED' }
+    // docId 已存在 = 该报告已反馈过
+    return { ok: true, duplicate: true }
   }
 }

@@ -38,7 +38,8 @@ cloud/functions/      login getStats submitTest getReports createOrder payCallba
 - **全终端小程序虚拟支付（D25）**：`createOrder`（code 换 session_key → 落单 → 签名 signData）→ 前端 `wx.requestVirtualPayment`；
   到账双保险：发货推送 `payCallback` + `checkOrder` 主动查单补写，均以 `xpay/query_order` 权威查单为准、`created → paid` 条件更新（D14）；
   推送处理失败返回非 0 让平台重推。签名/查单封装唯一源在 `cloud/shared/xpay.js`，改后运行 `npm run sync:cloud` 复制到 3 个支付云函数。
-- **清除数据**：报告/会话/事件/反馈删除，订单匿名化留存（已支付订单保留归属，付费权益不受影响），计数同步回减。
+- **清除数据**：报告/反馈/事件逐集合删除并汇总结果，任一失败返回失败可重试（界面以云端结果为准）；已支付未使用订单保留归属，其余订单 openid 换随机不可逆标识；查单原文清空；计数回减。
+- **合规入口**：首页首次进入隐私告知（同意前不采集行为数据）；首页/报告页页脚常驻三份协议 + 联系客服；报告页反馈区（`submitFeedback` 内 msgSecCheck，`config.json` 声明 openapi 权限）。
 - **计分 v2（只比形状）**：选择率 → 雷达相对自身 → 去均值余弦匹配原型与职业 → 对外只给档位 + 脚注（D27）。
   计分/题库/职业库/原型任何改动须跑 `npm run test:scoring`（全枚举 419 万种 PRO 答法，约 6 分钟，带门槛判定）。
 

@@ -1,0 +1,43 @@
+.agree-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(31, 35, 51, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.agree-panel {
+  width: 600px;
+  max-height: 75vh;
+  background: #fff;
+  border-radius: 24px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.agree-title {
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.agree-body {
+  flex: 1;
+  margin-top: 24px;
+  font-size: 23px;
+  line-height: 1.8;
+  color: var(--c-text);
+  white-space: pre-wrap;
+  max-height: 56vh;
+}
+
+.agree-close {
+  margin-top: 28px;
+  height: 80px;
+}

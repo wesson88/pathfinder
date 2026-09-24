@@ -1,44 +1,61 @@
+const crypto = require('crypto')
 const cloud = require('wx-server-sdk')
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 
+// 集合不存在（如已下线的 sessions）视为无数据可删
+const COLLECTION_NOT_EXIST = -502005
+
 /**
- * 「清除我的数据」（D15）：删除报告、作答会话、事件、反馈；
- * 订单匿名化保留（财务凭证要求）——但已支付订单保留归属（盲审修复：
- * 原逻辑连 paid 单一并匿名化，会误伤 submitTest/checkOrder 按 openid 查找的付费权益），
- * 仅匿名化其余状态订单。报告删除后回减 counters，保持「N 人已测」真实。
+ * 「清除我的数据」（D15，05 §4）：
+ * - 逐集合删除 reports / feedback / events（及历史遗留 sessions），逐项收集结果；任一失败返回 ok:false，
+ *   前端提示可重试（操作幂等）。二轮盲审 X6：原实现吞掉异常照样返回 ok，界面还先于云端提示「已清除」
+ * - orders：paid 未核销订单保留归属（保障用户已付费的权益，可继续使用或申请退款）；
+ *   其余订单 openid 替换为随机不可逆标识。所有订单清空查单原文 queryRaw 与历史字段 callbackRaw
+ * - 报告删除后回减计数
+ * - 删除完成后不写任何带 openid 的事件
  */
 exports.main = async () => {
   const { OPENID } = cloud.getWXContext()
   if (!OPENID) return { ok: false, error: 'NO_OPENID' }
 
-  const removeByOpenid = async (name) => {
+  const failed = []
+  const removed = {}
+
+  for (const name of ['reports', 'feedback', 'events', 'sessions']) {
     try {
       const r = await db.collection(name).where({ openid: OPENID }).remove()
-      return (r.stats && r.stats.removed) || 0
+      removed[name] = (r.stats && r.stats.removed) || 0
     } catch (e) {
-      return 0
+      if (e && e.errCode === COLLECTION_NOT_EXIST) removed[name] = 0
+      else failed.push(name)
     }
   }
 
-  const reports = await removeByOpenid('reports')
-  const sessions = await removeByOpenid('sessions')
-  const events = await removeByOpenid('events')
-  const feedback = await removeByOpenid('feedback')
-
-  // 回减计数（失败不影响删除应答；不可为负由展示层兜底：home 仅在 >0 时展示）
-  if (reports > 0) {
+  if (removed.reports > 0) {
     try {
-      await db.collection('counters').doc('reports').update({ data: { reportsTotal: _.inc(-reports) } })
-    } catch (e) { /* ignore */ }
+      await db.collection('counters').doc('reports').update({ data: { reportsTotal: _.inc(-removed.reports) } })
+    } catch (e) { /* 计数偏差不影响删除结果；展示层仅在 >0 时展示 */ }
   }
 
   try {
     await db.collection('orders')
+      .where({ openid: OPENID, status: 'paid' })
+      .update({ data: { queryRaw: '', callbackRaw: _.remove() } })
+    await db.collection('orders')
       .where({ openid: OPENID, status: _.neq('paid') })
-      .update({ data: { openid: 'anonymized' } })
-  } catch (e) { /* 匿名化失败不阻塞删除应答 */ }
+      .update({
+        data: {
+          openid: `deleted-${crypto.randomBytes(12).toString('hex')}`,
+          queryRaw: '',
+          callbackRaw: _.remove()
+        }
+      })
+  } catch (e) {
+    failed.push('orders')
+  }
 
-  return { ok: true, removed: { reports, sessions, events, feedback } }
+  if (failed.length) return { ok: false, error: 'PARTIAL_FAILED', failed, removed }
+  return { ok: true, removed }
 }

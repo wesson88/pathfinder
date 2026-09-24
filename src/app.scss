@@ -75,3 +75,14 @@ button {
   font-size: 20px;
   font-weight: 600;
 }
+
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 44px;
+  border: 2px solid var(--c-primary);
+  color: var(--c-primary-deep);
+  font-size: 28px;
+  background: #fff;
+}

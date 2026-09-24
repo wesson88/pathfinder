@@ -5,6 +5,7 @@ import { QuizSession, ReportItem, Version } from '../data/types'
 const KEY_SESSION = (v: Version) => `ct_session_${v}`
 const KEY_REPORTS = 'ct_reports'
 const KEY_MOCK_PRO = 'ct_mock_pro_unlocked'
+const KEY_CONSENT = 'ct_privacy_consent'
 const SESSION_TTL = 7 * 24 * 3600 * 1000 // 7 天过期（M3）
 
 const get = <T,>(key: string, fallback: T): T => {
@@ -119,13 +120,23 @@ export const setMockProUnlocked = (v: boolean) => {
   } catch { /* ignore */ }
 }
 
+/* ---------------- 隐私告知同意（09 §5：同意前不采集行为数据） ---------------- */
+
+export const hasConsent = () => get<boolean>(KEY_CONSENT, false)
+
+export const setConsent = () => {
+  try {
+    Taro.setStorageSync(KEY_CONSENT, true)
+  } catch { /* ignore */ }
+}
+
 /* ---------------- 「清除我的数据」本地部分（D15） ---------------- */
 
+/** 清除答卷与报告缓存；隐私同意标记与（mock 的）已付费权益保留——与云端「paid 订单保留归属」一致 */
 export function clearAllLocal() {
   try {
     Taro.removeStorageSync(KEY_SESSION('fun'))
     Taro.removeStorageSync(KEY_SESSION('pro'))
     Taro.removeStorageSync(KEY_REPORTS)
-    Taro.removeStorageSync(KEY_MOCK_PRO)
   } catch { /* ignore */ }
 }

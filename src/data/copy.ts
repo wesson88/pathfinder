@@ -95,12 +95,28 @@ export const SHARE_COPY = {
   homeTitle: '天赋星球｜找到让你闪闪发光的职业'
 }
 
-/** 「大家怎么说」（D18：内测体验官标注） */
-export const TESTIMONIALS = [
-  { who: '产品经理 · 内测体验官', text: '原来我一直擅长的事情，真的可以成为职业方向。' },
-  { who: 'HR · 内测体验官', text: '雷达图和我的自我认知几乎重合，建议栏也很可执行。' },
-  { who: '设计师 · 内测体验官', text: '几分钟做完，结果比想象中细致，转给了整个组。' }
-]
+/** 首页社交证明（D20）：口径是报告份数，不是人数（二轮盲审 X5）。「大家怎么说」评价区已下线（D30） */
+export const statsText = (n: number) => `已生成 ${n} 份天赋报告`
+
+/** 首次进入的隐私告知（PIPL 第 17 条：处理前告知；同意前不采集行为数据，09 §5） */
+export const CONSENT_COPY = {
+  title: '欢迎来到天赋星球',
+  body: '为了生成你的报告，我们会处理你的微信标识、答卷与使用行为数据，不收集昵称、头像、手机号。详见',
+  agree: '同意并继续'
+}
+
+/** 报告页反馈区（07 §2） */
+export const FEEDBACK_COPY = {
+  title: '这份报告像你吗？',
+  good: '还挺准',
+  bad: '不太准',
+  placeholder: '选填：说说哪里像、哪里不像（200 字内）',
+  submit: '提交反馈',
+  thanks: '谢谢你的反馈，我们会用它改进题目'
+}
+
+/** 质量提示（03 §6）：标注不拦截、不羞辱 */
+export const QC_NOTICE = '这次作答节奏较快，结果可能不太稳定——有空可以凭第一直觉再测一次'
 
 /** 档位化展示：v2 结果自带档位；以下两个仅用于 v1 旧报告兼容（按旧百分比换算档位） */
 export const legacyArchetypeTier = (match: number) => (match >= 80 ? '高度匹配' : '较为匹配')

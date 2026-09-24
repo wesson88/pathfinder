@@ -20,7 +20,8 @@ const config = {
     )
   },
   copy: {
-    patterns: [],
+    // 分享卡静态图等按路径引用的资源（非 import 引用，需显式拷贝到 dist）
+    patterns: [{ from: 'src/assets/', to: 'dist/assets/' }],
     options: {}
   },
   framework: 'react',

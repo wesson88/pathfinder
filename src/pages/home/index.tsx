@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import Taro, { useDidShow, useShareAppMessage } from '@tarojs/taro'
-import { HOME_COPY, SHARE_COPY, TESTIMONIALS } from '../../data/copy'
+import AgreementModal from '../../components/AgreementModal'
+import FooterLinks from '../../components/FooterLinks'
+import { CONSENT_COPY, HOME_COPY, SHARE_COPY, statsText } from '../../data/copy'
 import { callCloud } from '../../utils/cloud'
 import {
   answerCount,
   clearAllLocal,
   getSession,
+  hasConsent,
   isSessionComplete,
-  questionCount
+  questionCount,
+  setConsent
 } from '../../utils/storage'
 import { track } from '../../utils/track'
 import { QuizSession, Version } from '../../data/types'
@@ -16,6 +20,9 @@ import './index.scss'
 export default function Home() {
   const [reportsTotal, setReportsTotal] = useState(0)
   const [resume, setResume] = useState<{ session: QuizSession; version: Version } | null>(null)
+  const [consented, setConsented] = useState(hasConsent())
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [clearing, setClearing] = useState(false)
 
   useShareAppMessage(() => {
     track('report_share', { from: 'home' })
@@ -25,7 +32,6 @@ export default function Home() {
   useDidShow(() => {
     track('home_view')
     // 双会话规则：取 updatedAt 最新的未完成会话作为「继续」目标；次要入口在记录页
-    // 完成度判定与 quiz/submitTest 同源（盲审修复：原 isDone 键数统计会放过脏数据会话）
     const candidates = (['fun', 'pro'] as Version[])
       .map(v => ({ version: v, session: getSession(v) }))
       .filter((x): x is { version: Version; session: QuizSession } => !!x.session && !isSessionComplete(x.session))
@@ -37,6 +43,12 @@ export default function Home() {
       .catch(() => setReportsTotal(0))
   })
 
+  const onConsent = () => {
+    setConsent()
+    setConsented(true)
+    track('home_view')
+  }
+
   const onCta = () => {
     track('home_cta_click', { resume: !!resume, version: resume?.version })
     if (resume) {
@@ -46,21 +58,34 @@ export default function Home() {
     }
   }
 
+  /** 以云端结果为准提示成败（二轮盲审 X6：原先提示「已清除」再调云端，失败静默） */
   const onClearData = () => {
+    if (clearing) return
     Taro.showModal({
       title: '清除我的数据',
-      content: '将删除本机与云端的答题记录、报告与行为数据（订单将匿名化留存，已支付的权益不受影响），确定吗？',
+      content: '将删除你在本机与云端的答卷、报告、反馈与行为数据。已付费但尚未使用的 PRO 会保留，确定吗？',
       confirmText: '清除',
       confirmColor: '#6D28D9',
       success: (r) => {
         if (!r.confirm) return
-        clearAllLocal()
-        Taro.showToast({ title: '已清除', icon: 'success' })
-        setResume(null)
-        // 删除成功后再补记埋点（盲审修复竞态：先记会被本次 deleteMyData 的 events 清空吞掉）
+        setClearing(true)
+        Taro.showLoading({ title: '正在清除' })
         callCloud('deleteMyData')
-          .then(() => track('data_delete'))
-          .catch(() => { /* 云端失败不阻塞，本机已清 */ })
+          .then(() => {
+            clearAllLocal()
+            setResume(null)
+            Taro.hideLoading()
+            Taro.showToast({ title: '已清除', icon: 'success' })
+          })
+          .catch(() => {
+            Taro.hideLoading()
+            Taro.showModal({
+              title: '部分数据未清除',
+              content: '网络或服务异常，请稍后再试一次；也可以联系客服处理。',
+              showCancel: false
+            })
+          })
+          .finally(() => setClearing(false))
       }
     })
   }
@@ -78,9 +103,7 @@ export default function Home() {
           ))}
         </view>
         <view className='hero-sub'>{HOME_COPY.sub}</view>
-        {reportsTotal > 0 && (
-          <view className='hero-stats'>已有 {reportsTotal} 人解锁了自己的天赋图谱</view>
-        )}
+        {reportsTotal > 0 && <view className='hero-stats'>{statsText(reportsTotal)}</view>}
       </view>
 
       <view className='btn-primary home-cta' onClick={onCta}>{ctaText}</view>
@@ -96,20 +119,25 @@ export default function Home() {
         ))}
       </view>
 
-      <view className='card testimonials'>
-        <view className='section-title'>大家怎么说</view>
-        {TESTIMONIALS.map(t => (
-          <view key={t.who} className='t-item'>
-            <view className='t-text'>「{t.text}」</view>
-            <view className='t-who'>{t.who}</view>
-          </view>
-        ))}
-      </view>
-
       <view className='home-footer'>
         <view className='disclaimer'>{HOME_COPY.disclaimer}</view>
+        <FooterLinks source='home' />
         <view className='clear-link' onClick={onClearData}>清除我的数据</view>
       </view>
+
+      {!consented && (
+        <view className='consent-mask'>
+          <view className='consent-panel'>
+            <view className='consent-title'>{CONSENT_COPY.title}</view>
+            <view className='consent-body'>
+              {CONSENT_COPY.body}
+              <text className='consent-link' onClick={() => setPrivacyOpen(true)}>《隐私政策》</text>
+            </view>
+            <view className='btn-primary consent-btn' onClick={onConsent}>{CONSENT_COPY.agree}</view>
+          </view>
+        </view>
+      )}
+      <AgreementModal agreementKey={privacyOpen ? 'privacy' : null} onClose={() => setPrivacyOpen(false)} />
     </view>
   )
 }

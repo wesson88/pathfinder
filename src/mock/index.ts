@@ -14,7 +14,7 @@ import { ReportItem } from '../data/types'
 export async function mockCall(name: string, data: Record<string, any>): Promise<any> {
   switch (name) {
     case 'login':
-      return { ok: true, openid: 'mock-openid' }
+      return { ok: true }
 
     case 'getStats':
       // D20 修订：只返回真实报告计数，虚构基数已废弃
@@ -38,7 +38,11 @@ export async function mockCall(name: string, data: Record<string, any>): Promise
     }
 
     case 'getReports':
-      return { ok: true, reports: getCachedReports() }
+      return {
+        ok: true,
+        reports: data.id ? getCachedReports().filter(r => r._id === data.id) : getCachedReports(),
+        hasMore: false
+      }
 
     case 'createOrder':
       // 与云端一致的防重复收款：已有已支付未使用 → 拒绝下单
@@ -51,6 +55,7 @@ export async function mockCall(name: string, data: Record<string, any>): Promise
       return { ok: true, hasPaidUnused: getMockProUnlocked(), stalePaid: false }
 
     case 'submitFeedback':
+      if (!data.reportId || !['good', 'bad'].includes(data.accuracy)) return { ok: false, error: 'BAD_REQUEST' }
       return { ok: true }
 
     case 'sessionSync':

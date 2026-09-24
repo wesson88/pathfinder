@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import Taro from '@tarojs/taro'
-import { ScrollView } from '@tarojs/components'
 import { formatPrice, proPriceFen } from '../../config'
-import { AGREEMENTS, AGREEMENT_LINKS, AgreementKey, CHECKBOX_TEXT } from '../../data/agreements'
+import AgreementModal from '../../components/AgreementModal'
+import { AGREEMENT_LINKS, AgreementKey, CHECKBOX_TEXT } from '../../data/agreements'
 import { PAY_COPY } from '../../data/copy'
 import { isMockMode } from '../../utils/cloud'
 import { checkOrder, payPro } from '../../utils/pay'
@@ -79,7 +79,6 @@ export default function PayConfirm() {
       })
   }
 
-  const modal = modalKey ? AGREEMENTS[modalKey] : null
   const btnText = checking
     ? '正在确认订单…'
     : checkFailed
@@ -119,15 +118,7 @@ export default function PayConfirm() {
       </view>
       <view className='pay-note'>{PAY_COPY.note}</view>
 
-      {modal && (
-        <view className='agree-mask' onClick={() => setModalKey(null)}>
-          <view className='agree-panel' onClick={(e) => e.stopPropagation()}>
-            <view className='agree-title'>{modal.title}</view>
-            <ScrollView scrollY className='agree-body'>{modal.body}</ScrollView>
-            <view className='btn-primary agree-close' onClick={() => setModalKey(null)}>我已阅读</view>
-          </view>
-        </view>
-      )}
+      <AgreementModal agreementKey={modalKey} onClose={() => setModalKey(null)} />
     </view>
   )
 }
