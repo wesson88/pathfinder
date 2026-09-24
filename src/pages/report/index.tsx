@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import RadarChart from '../../components/RadarChart'
-import { isIosPayHidden } from '../../config'
 import {
   DIM_EXPLAIN,
   DIM_LEVEL,
@@ -72,8 +71,8 @@ export default function Report() {
   if (!report) return null
   const r = report.result
   const isPro = r.version === 'pro'
-  // iOS hidden 铁律同样适用于报告页的 PRO 转化卡：整卡不展示
-  const upsellVisible = !isPro && !isIosPayHidden()
+  // 全终端虚拟支付（D25）：转化卡各平台一致展示
+  const upsellVisible = !isPro
   // v2 结果自带档位；v1 旧报告按旧百分比换算（不迁移，M7 版本化）
   const archetypeTierText =
     r.archetypeTier || (r.archetypeMatch != null ? legacyArchetypeTier(r.archetypeMatch) : '')

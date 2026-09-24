@@ -18,17 +18,36 @@ if (USE_MOCK && process.env.NODE_ENV === 'production') {
   throw new Error('[career-test] 生产构建禁止包含 mock：请移除 TARO_APP_MOCK 后重新构建')
 }
 
-/** PRO 价格（单位：分）。唯一事实源在云函数 createOrder 内硬编码，本常量仅作展示（M4 §5） */
-export const PRICE_PRO_FEN = 99
+/**
+ * 运行时第二道防线（二轮盲审技术 M6）：dev:weapp 产物默认 mock=true，若被误上传为体验版/正式版，
+ * 构建期检查拦不住——按小程序运行环境再拦一次，体验版/正式版里 mock 态直接抛错。
+ */
+if (USE_MOCK) {
+  let envVersion = 'develop'
+  try {
+    envVersion = Taro.getAccountInfoSync().miniProgram.envVersion
+  } catch { /* 非小程序环境（如单测）忽略 */ }
+  if (envVersion === 'release' || envVersion === 'trial') {
+    throw new Error('[career-test] 体验版/正式版禁止运行 mock 构建产物')
+  }
+}
 
-/** iOS 苹果内购档位价：IAP 无 ¥0.99 档，最低 ¥1（M4 §3），以后台档位配置为准 */
+/**
+ * PRO 展示价格（单位：分）。唯一事实源在云函数 xpay.PRICE（M4 §3），本常量仅作展示。
+ * 全终端小程序虚拟支付（D25）：安卓/PC ¥0.99；iOS 走苹果档位制最低 ¥1。
+ */
+export const PRICE_PRO_FEN = 99
 export const PRICE_PRO_IOS_FEN = 100
 
-/** iOS 虚拟支付模式：'hidden' = 未开通 IAP，PRO 卡片在 iOS 整体不展示；'iap' = 已开通（M4 §3） */
-export const PAY_IOS_MODE: 'hidden' | 'iap' = 'hidden'
+export const currentPlatform = () => {
+  try {
+    return Taro.getDeviceInfo().platform
+  } catch {
+    return 'unknown'
+  }
+}
 
-/** iOS 未开通虚拟支付：PRO 相关入口整体隐藏（M4 §3 铁律）。页面统一用此判定，勿各自拼 platform 判断 */
-export const isIosPayHidden = () =>
-  Taro.getDeviceInfo().platform === 'ios' && PAY_IOS_MODE === 'hidden'
+/** 当前设备的 PRO 展示价 */
+export const proPriceFen = () => (currentPlatform() === 'ios' ? PRICE_PRO_IOS_FEN : PRICE_PRO_FEN)
 
 export const formatPrice = (fen: number) => `¥${(fen / 100).toFixed(2)}`

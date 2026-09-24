@@ -41,12 +41,14 @@ export async function mockCall(name: string, data: Record<string, any>): Promise
       return { ok: true, reports: getCachedReports() }
 
     case 'createOrder':
-      // 模拟支付：直接置为已解锁
+      // 与云端一致的防重复收款：已有已支付未使用 → 拒绝下单
+      if (getMockProUnlocked()) return { ok: false, error: 'HAS_PAID_UNUSED' }
+      // 模拟支付：直接置为已支付，payParams 为 null（跳过 wx.requestVirtualPayment）
       setMockProUnlocked(true)
-      return { ok: true, outTradeNo: `mock-${Date.now()}`, payment: null }
+      return { ok: true, outTradeNo: `mock-${Date.now()}`, payParams: null }
 
     case 'checkOrder':
-      return { ok: true, hasPaidUnused: getMockProUnlocked() }
+      return { ok: true, hasPaidUnused: getMockProUnlocked(), stalePaid: false }
 
     case 'submitFeedback':
       return { ok: true }

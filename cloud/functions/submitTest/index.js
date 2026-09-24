@@ -66,13 +66,35 @@ function validateResult(version, result) {
   return result.topDims.every(d => DIMS.includes(d))
 }
 
+/** 报告计数：事务外 best-effort；计数文档不存在时创建（失败不影响交卷） */
+async function bumpCounter() {
+  try {
+    const r = await db.collection('counters').doc('reports').update({ data: { reportsTotal: _.inc(1) } })
+    if (r && r.stats && r.stats.updated === 0) throw new Error('NO_COUNTER_DOC')
+  } catch (e) {
+    await db.collection('counters').add({ data: { _id: 'reports', reportsTotal: 1 } }).catch(() => {})
+  }
+}
+
+/** 按 docId 查已存在的报告：本人 → 幂等成功；他人 → 冲突；不存在 → null */
+async function existingReport(sessionId, openid) {
+  const doc = await db.collection('reports').doc(sessionId).get()
+    .then(d => (Array.isArray(d.data) ? d.data[0] : d.data))
+    .catch(() => null)
+  if (!doc) return null
+  return doc.openid === openid
+    ? { ok: true, reportId: sessionId, duplicate: true }
+    : { ok: false, error: 'SESSION_CONFLICT' }
+}
+
 /**
- * 交卷（幂等核心，03 §5 盲审重构版）：
- * - 报告 docId = sessionId：重复提交天然去重（set 语义由「add + 查重」实现，避免重复计数）
- * - 云端逐题校验 + result 结构校验 + 24h 频控（盲审修复：原仅有键数统计，六键垃圾卷可直写 reports）
- * - PRO：先查一笔 paid 订单（事务外），事务内按 docId 复核 paid → 条件更新 consumed → 同事务写入 reports + 递增 counters
- * - 事务冲突重试 ≤3；订单被并发核销则换下一笔
- * - 幂等去重校验归属：本人重复提交幂等成功；sessionId 被他人占用则明确报错（盲审修复：原判定不校验归属，会静默吞单）
+ * 交卷（幂等核心，03 §5）：
+ * - 幂等前置（二轮盲审技术 H1）：先按 reports.doc(sessionId) 查——本人已交过直接返回，不进任何订单逻辑。
+ *   原顺序「先查 paid 订单」会让「交卷成功但响应丢失」的重试拿到 NO_PAID_ORDER，被引导二次付款
+ * - 云端逐题校验 + result 结构校验 + 24h 频控
+ * - PRO：先查一笔 paid 订单（事务外），事务内按 docId 复核 paid → 条件更新 consumed → 同事务写入 reports
+ * - 事务冲突重试 ≤3；订单被并发核销时先复查报告（可能正是本会话的并发请求写入），再换下一笔
+ * - 计数移出事务 best-effort（二轮盲审技术 M1：全局计数器在事务内成写热点）
  */
 exports.main = async (event) => {
   const { OPENID } = cloud.getWXContext()
@@ -85,6 +107,9 @@ exports.main = async (event) => {
 
   if (!validateAnswers(version, answers)) return { ok: false, error: 'INVALID_ANSWERS' }
   if (!validateResult(version, result)) return { ok: false, error: 'INVALID_RESULT' }
+
+  const dup = await existingReport(sessionId, OPENID)
+  if (dup) return dup
 
   // 频控：计数失败不拦截交卷
   try {
@@ -122,16 +147,15 @@ exports.main = async (event) => {
         await t.collection('reports').add({
           data: { _id: sessionId, openid: OPENID, version, result, answers, createdAt: now, updatedAt: now }
         })
-        try {
-          await t.collection('counters').doc('reports').update({ data: { reportsTotal: _.inc(1) } })
-        } catch (e) {
-          await t.collection('counters').add({ data: { _id: 'reports', reportsTotal: 1 } })
-        }
       })
+      await bumpCounter()
       return { ok: true, reportId: sessionId }
     } catch (e) {
       const msg = (e && e.message) || ''
       if (msg === 'ORDER_CONFLICT') {
+        // 可能是本会话的并发请求（如双击交卷）已核销并写入报告：先复查，命中即幂等成功
+        const again = await existingReport(sessionId, OPENID)
+        if (again) return again
         // 该订单被他端核销：换下一笔 paid 订单重试（排除刚冲突的这笔，防同单死循环）
         const q2 = await db.collection('orders')
           .where({ openid: OPENID, status: 'paid' })
@@ -143,14 +167,9 @@ exports.main = async (event) => {
         order = next
         continue
       }
-      // 同 sessionId 已存在：校验归属
-      const existing = await db.collection('reports').doc(sessionId).get()
-        .then(d => d.data).catch(() => null)
-      if (existing) {
-        const owner = Array.isArray(existing) ? existing[0] : existing
-        if (owner && owner.openid === OPENID) return { ok: true, reportId: sessionId, duplicate: true }
-        return { ok: false, error: 'SESSION_CONFLICT' }
-      }
+      // 并发请求已写入同 sessionId：校验归属
+      const existing = await existingReport(sessionId, OPENID)
+      if (existing) return existing
       // 其余（事务写冲突）：重试
     }
   }

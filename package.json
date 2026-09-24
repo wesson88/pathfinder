@@ -7,7 +7,9 @@
     "dev:weapp": "npm run build:weapp -- --watch",
     "build:weapp": "taro build --type weapp",
     "typecheck": "tsc --noEmit",
-    "test:scoring": "tsx scripts/enumerate-scoring.ts"
+    "test:scoring": "tsx scripts/enumerate-scoring.ts",
+    "sync:cloud": "node scripts/sync-cloud-shared.js",
+    "check:cloud": "node scripts/sync-cloud-shared.js --check"
   },
   "browserslist": [
     "last 3 versions",

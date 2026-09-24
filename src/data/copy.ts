@@ -70,15 +70,23 @@ export const HOME_COPY = {
   disclaimer: '测评结果仅供自我探索与职业启发，不构成专业诊断'
 }
 
-/** 趣味版报告的 PRO 转化卡（D16；盲审修订：不点名数量钩子替代卖点罗列） */
+/** 趣味版报告的 PRO 转化卡（D16；D26：CTA 说清是付费再做一次 PRO 测试，不是解锁当前报告） */
 export const UPSELL_COPY = {
   title: '想看看你和哪些职业方向最配？',
-  cta: '解锁 PRO 完整报告'
+  cta: '做一次 PRO 深度测试'
 }
 
-/** n 来自 result.careerFitHint（趣味版计分时静默计算） */
+/** n 来自 result.careerFitHint（趣味版计分时静默计算，v2 全枚举 5~15） */
 export const upsellDesc = (n: number) =>
-  `你的画像已与 ${n} 个职业方向较为适配——它们是谁？PRO 报告还包含你的职业原型与成长行动建议`
+  `你的画像与 ${n} 个职业方向较为适配——它们是谁？PRO 深度版 12 题，报告含职业原型、Top3 方向与成长建议`
+
+/** PRO 付费文案（D26：每次付费生成 1 份 PRO 报告，永久查看；不得写「一次解锁永久可测」） */
+export const PAY_COPY = {
+  name: 'PRO 深度版',
+  meta: '12 题 · 约 4 分钟 · 每次付费生成 1 份报告，永久查看',
+  feats: ['你的职业原型与匹配解读', '适配的职业方向 Top3', '优势放大与盲区提醒'],
+  note: '由微信小程序虚拟支付收款 · 生成报告前可申请退款'
+}
 
 /** 分享模板（D19 转发卡片；不带任何百分比，08 §2） */
 export const SHARE_COPY = {

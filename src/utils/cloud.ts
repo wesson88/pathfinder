@@ -10,12 +10,10 @@ export async function callCloud<T = any>(
   name: string,
   data?: Record<string, any>
 ): Promise<T> {
-  if (USE_MOCK) {
-    return mockCall(name, data || {}) as T
-  }
-
-  const res = await Taro.cloud.callFunction({ name, data: data || {} })
-  const result = res.result as Record<string, any>
+  // mock 与真实云端同一套 ok:false → 抛错语义（原 mock 分支直接返回，错误码永远到不了调用方）
+  const result = (USE_MOCK
+    ? await mockCall(name, data || {})
+    : (await Taro.cloud.callFunction({ name, data: data || {} })).result) as Record<string, any>
   if (!result || result.ok === false) {
     throw new Error((result && result.error) || 'CLOUD_ERROR')
   }
