@@ -7,7 +7,7 @@
 import { bankOf } from '../src/data/banks'
 import { AnswerValue, TestResult, Version } from '../src/data/types'
 import { computeResult, matchCareers, CAREER_TIERS } from '../src/utils/scoring'
-import { DIM_ORDER } from '../src/data/archetypes'
+import { DIM_META, DIM_ORDER } from '../src/data/archetypes'
 import { levelOf } from '../src/data/copy'
 
 interface Stats {
@@ -20,6 +20,10 @@ interface Stats {
   fitHint: number[]
   allLow: number
   noHigh: number
+  /** 语义断言（三轮盲审产品 H1/M3：分布正确 ≠ 文案属实） */
+  badReason: number
+  badInsight: number
+  careerTier: Map<string, number>
 }
 
 const inc = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) || 0) + 1)
@@ -40,7 +44,10 @@ function enumerate(version: Version): Stats {
     fitHintZero: 0,
     fitHint: [],
     allLow: 0,
-    noHigh: 0
+    noHigh: 0,
+    badReason: 0,
+    badInsight: 0,
+    careerTier: new Map()
   }
   const fitCounts = new Map<number, number>()
   for (;;) {
@@ -52,6 +59,14 @@ function enumerate(version: Version): Stats {
     if (levels.every(l => l === 'low')) stats.allLow++
     if (!levels.includes('high')) stats.noHigh++
     if (version === 'pro') {
+      // 理由与核心洞察引用的维度：不得是待激活（<60），理由维度还须高于本人均值
+      const mean = DIM_ORDER.reduce((a, d) => a + r.scores[d], 0) / DIM_ORDER.length
+      const lowLabels = DIM_ORDER.filter(d => r.scores[d] < 60).map(d => DIM_META[d].label)
+      const belowMean = DIM_ORDER.filter(d => r.scores[d] <= mean).map(d => DIM_META[d].label)
+      if ((r.careers || []).some(c => [...lowLabels, ...belowMean].some(l => c.reason.includes(l)))) stats.badReason++
+      const m = /你最常展现的是(.+?)与(.+?)的倾向/.exec(r.coreInsight)
+      if (m && (lowLabels.includes(m[1]) || lowLabels.includes(m[2]))) stats.badInsight++
+      ;(r.careers || []).forEach((c, k) => inc(stats.careerTier, `Top${k + 1}:${c.tier}`))
       const names = (r.careers || []).map(c => c.name)
       inc(stats.top3, names.join(' | '))
       inc(stats.top1, names[0])
@@ -94,7 +109,7 @@ for (const version of ['fun', 'pro'] as Version[]) {
   const s = enumerate(version)
   console.log(`\n== ${version.toUpperCase()}：${s.total} 种答法（${((Date.now() - t0) / 1000).toFixed(1)}s）`)
   const hint = s.fitHint
-  console.log(`  钩子 N（r≥${CAREER_TIERS.mid}）P5/P50/P95 = ${quantile(hint, 0.05)}/${quantile(hint, 0.5)}/${quantile(hint, 0.95)}`)
+  console.log(`  钩子 N（r≥${CAREER_TIERS.mid}）范围 ${hint[0]}~${hint[hint.length - 1]}，P5/P50/P95 = ${quantile(hint, 0.05)}/${quantile(hint, 0.5)}/${quantile(hint, 0.95)}`)
   console.log(`  无「优势区」维度占比 ${pct(s.noHigh / s.total)}；五维全「待激活」占比 ${pct(s.allLow / s.total)}`)
   gate(s.noHigh === 0, '每份报告至少一个优势区维度')
   gate(s.allLow === 0, '不存在五维全待激活')
@@ -111,6 +126,11 @@ for (const version of ['fun', 'pro'] as Version[]) {
     gate(s.top1.size >= 20, 'Top1 职业可达数 ≥ 20')
     gate((s.archetypeTier.get('高度匹配') || 0) / s.total < 0.9, '原型「高度匹配」占比 < 90%')
     gate(s.archetypeName.size === 10, '10 个原型全部可达')
+    console.log(`  职业档位 ${[...s.careerTier.entries()].sort().map(([k, v]) => `${k} ${pct(v / s.total)}`).join(' / ')}`)
+    gate(s.badReason === 0, `职业理由不引用待激活或低于均值的维度（违例 ${s.badReason}）`)
+    gate(s.badInsight === 0, `核心洞察「最常展现」不引用待激活维度（违例 ${s.badInsight}）`)
+    gate((s.careerTier.get('Top1:高度适配') || 0) / s.total < 0.97, 'Top1 高度适配占比 < 97%（名次定档后 Top2/3 不再全是高度）')
+    gate(!s.careerTier.has('Top3:高度适配') && !s.careerTier.has('Top2:高度适配'), 'Top2/Top3 不出现高度适配（D34 名次相对定档）')
   }
 }
 

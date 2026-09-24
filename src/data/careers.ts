@@ -2,7 +2,7 @@ import { DimKey, DimScores } from './types'
 
 /**
  * 职业库：30 个职业 × 五维需求权重（0~1，一位小数）。
- * 规范见项目记录《13-题库工程规范-代码侧》§7：匹配分 = Σ(w×score)/Σw，可持续扩充，不动题库。
+ * 规范见项目记录《13-题库工程规范-代码侧》§7：计分 v2 为去均值余弦（形状相关），可持续扩充，不动题库。
  */
 export interface CareerItem {
   name: string

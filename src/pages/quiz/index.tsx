@@ -87,7 +87,7 @@ export default function Quiz() {
     Taro.showModal({
       title: '重新开始？',
       content: version === 'pro'
-        ? '当前作答进度将被清空（不影响已支付的解锁权益），确定重新开始吗？'
+        ? '当前作答进度将被清空（已支付的 PRO 不受影响，重新作答不再收费），确定重新开始吗？'
         : '当前作答进度将被清空，确定重新开始吗？',
       success: (r) => {
         if (!r.confirm) return

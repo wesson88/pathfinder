@@ -91,8 +91,17 @@ function qualitySignals(questions: Question[], answers: Record<string, AnswerVal
   return { fastRatio: fast / done.length, sameKeyRatio: topKey / done.length }
 }
 
-export const careerTierOf = (r: number) =>
-  r >= CAREER_TIERS.high ? '高度适配' : r >= CAREER_TIERS.mid ? '较为适配' : '值得关注'
+const CAREER_TIER_NAMES = ['高度适配', '较为适配', '值得关注']
+
+/** 绝对档（按形状相关系数 r） */
+const absoluteCareerTier = (r: number) => (r >= CAREER_TIERS.high ? 0 : r >= CAREER_TIERS.mid ? 1 : 2)
+
+/**
+ * 职业档位（D34：按名次相对定档，拉开区分度）：Top1 高度 / Top2 较为 / Top3 值得关注，
+ * 并以绝对档封顶——相关系数不够时不会因名次靠前而被抬高。
+ */
+export const careerTierOf = (r: number, rank = 0) =>
+  CAREER_TIER_NAMES[Math.max(Math.min(rank, 2), absoluteCareerTier(r))]
 
 export const archetypeTierOf = (sim: number) =>
   sim >= ARCHETYPE_TIERS.high ? '高度匹配' : sim >= ARCHETYPE_TIERS.mid ? '较为匹配' : '特征较均衡'
@@ -104,22 +113,28 @@ export const archetypeTierOf = (sim: number) =>
 export function matchCareers(p: DimScores) {
   const pv = DIM_ORDER.map(d => p[d])
   const c = centered(pv)
+  // 与报告雷达同一口径的「待激活」判定（radar < 60）：理由绝不引用待激活维度
+  const pMax = Math.max(...pv)
+  const lowDim = pv.map(x => (pMax > 0 ? Math.round(40 + (55 * x) / pMax) : 40) < 60)
   return CAREERS.map((career, index) => {
     const wv = DIM_ORDER.map(d => career.weights[d])
     const wc = centered(wv)
     const r = cosine(c, wc)
     const wsum = wv.reduce((s, x) => s + x, 0)
     const weighted = pv.reduce((s, x, i) => s + x * wv[i], 0) / (wsum || 1)
-    // 匹配理由：你与这个方向在哪两点上对得上（贡献 c[d]×wc[d] 最大的两个维度）
-    const contrib = DIM_ORDER.map((d, i) => ({ d, v: c[i] * wc[i] })).sort((a, b) => b.v - a.v)
-    const hits = contrib.filter(x => x.v > EPS).slice(0, 2).map(x => DIM_META[x.d].label)
+    // 匹配理由：只取用户与职业「都高于各自均值」的维度（c>0 且 wc>0）。
+    // 三轮盲审产品 H1：原只看乘积为正，负负得正会把用户偏低、职业也不看重的维度写成「更看重的」
+    const contrib = DIM_ORDER.map((d, i) => ({ d, c: c[i], w: wc[i], v: c[i] * wc[i] }))
+      .filter(x => x.c > EPS && x.w > EPS && !lowDim[DIM_ORDER.indexOf(x.d)])
+      .sort((a, b) => b.v - a.v)
+    const hits = contrib.slice(0, 2).map(x => DIM_META[x.d].label)
     const reason =
       hits.length === 2
         ? `你在${hits[0]}与${hits[1]}上的倾向，正是这个方向更看重的`
         : hits.length === 1
           ? `你在${hits[0]}上的倾向，正是这个方向更看重的`
           : '这个方向与你的画像有部分交集'
-    return { name: career.name, reason, r, weighted, index }
+    return { name: career.name, reason, reasonDims: contrib.slice(0, 2).map(x => x.d), r, weighted, index }
   }).sort((a, b) => {
     if (Math.abs(b.r - a.r) > EPS) return b.r - a.r
     if (Math.abs(b.weighted - a.weighted) > EPS) return b.weighted - a.weighted
@@ -214,19 +229,28 @@ export function computeResult(
   }
   const archetype = ARCHETYPES[bestKey]
   const [a1, a2] = archetype.coreDims
-  const top3: CareerMatch[] = careers.slice(0, 3).map(x => ({
+  const top3: CareerMatch[] = careers.slice(0, 3).map((x, rank) => ({
     name: x.name,
     reason: x.reason,
-    tier: careerTierOf(x.r)
+    tier: careerTierOf(x.r, rank)
   }))
+  const tier = archetypeTierOf(bestSim)
+  // 核心洞察：均衡画像不硬说「最常展现」；原型核心维落在待激活时改为「倾向组合」措辞（三轮产品 M3）
+  const coreLow = [a1, a2].some(d => scores[d] < 60)
+  const coreInsight =
+    tier === '特征较均衡'
+      ? `你的五维倾向比较均衡，没有特别突出的一两项；其中与你最接近的是${DIM_META[a1].label}与${DIM_META[a2].label}的组合。${archetype.strength}。`
+      : coreLow
+        ? `你的倾向组合最接近${DIM_META[a1].label}与${DIM_META[a2].label}。${archetype.strength}。`
+        : `你最常展现的是${DIM_META[a1].label}与${DIM_META[a2].label}的倾向。${archetype.strength}。`
 
   return {
     ...base,
     archetypeName: archetype.name,
     slogan: archetype.slogan,
     // 核心洞察引用原型自身维度，与称号同源（02 §5 ③）
-    coreInsight: `你最常展现的是${DIM_META[a1].label}与${DIM_META[a2].label}的倾向。${archetype.strength}。`,
-    archetypeTier: archetypeTierOf(bestSim),
+    coreInsight,
+    archetypeTier: tier,
     careers: top3,
     mirror: forcedMirror(questions, answers),
     advice: archetype.advice

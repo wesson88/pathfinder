@@ -1,7 +1,7 @@
 /** 测试版本：趣味版（免费）/ PRO 深度版（付费，每次付费生成 1 份报告） */
 export type Version = 'fun' | 'pro'
 
-/** 五大能力维度 */
+/** 五个倾向维度（测的是偏好倾向，不是能力，02 §2） */
 export type DimKey = 'insight' | 'creativity' | 'action' | 'collab' | 'stability'
 
 export type DimScores = Record<DimKey, number>
