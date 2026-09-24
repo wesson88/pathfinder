@@ -19,7 +19,7 @@ const get = <T,>(key: string, fallback: T): T => {
 
 export const questionCount = (version: Version) => bankOf(version).length
 
-/* ---------------- 答题会话（本地为主，云端经 sessionSync 双写） ---------------- */
+/* ---------------- 答题会话（仅本机，D28） ---------------- */
 
 export function getSession(version: Version): QuizSession | null {
   const s = get<QuizSession | null>(KEY_SESSION(version), null)

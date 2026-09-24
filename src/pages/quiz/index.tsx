@@ -18,9 +18,6 @@ import {
 import { track } from '../../utils/track'
 import './index.scss'
 
-/** 云端进度同步最小间隔：答题期间至多每 5s 一次，尾随补发最新一帧 */
-const SYNC_MIN_INTERVAL = 5000
-
 export default function Quiz() {
   const router = useRouter()
   const version = (router.params.version === 'pro' ? 'pro' : 'fun') as Version
@@ -32,9 +29,6 @@ export default function Quiz() {
   const [submitError, setSubmitError] = useState(false)
   const qStartRef = useRef(Date.now())
   const initedRef = useRef(false)
-  const lastSyncRef = useRef(0)
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const latestRef = useRef<QuizSession | null>(null)
   const submittedRef = useRef(false)
   const sessionRef = useRef<QuizSession | null>(null)
   const indexRef = useRef(0)
@@ -69,6 +63,8 @@ export default function Quiz() {
       setSession(s0)
       setIndex(firstUnansweredIndex(s0, version))
       qStartRef.current = Date.now()
+      // 已答完未交卷（上次交卷失败/杀进程）：从首页「生成上次测试报告」进入时自动重交（03 §4，幂等）
+      if (router.params.autoSubmit === '1' && isSessionComplete(s0)) submit(s0)
       return
     }
     // mock 模式下 PRO 需先解锁（真实模式由入口页 checkOrder / 支付页保障）
@@ -84,30 +80,8 @@ export default function Quiz() {
     qStartRef.current = Date.now()
   }, [])
 
-  const doSync = () => {
-    const s = latestRef.current
-    if (!s) return
-    latestRef.current = null
-    lastSyncRef.current = Date.now()
-    // 云端进度双写（M3）：fire-and-forget，失败不影响答题
-    callCloud('sessionSync', { session: s }).catch(() => { /* ignore */ })
-  }
-
-  const persist = (s: QuizSession) => {
-    saveSession(s)
-    // 节流双写（盲审修复：原每题一次云写）：≥SYNC_MIN_INTERVAL 一次，待发期间只更新最新帧
-    latestRef.current = s
-    if (syncTimerRef.current) return
-    const wait = SYNC_MIN_INTERVAL - (Date.now() - lastSyncRef.current)
-    if (wait <= 0) {
-      doSync()
-      return
-    }
-    syncTimerRef.current = setTimeout(() => {
-      syncTimerRef.current = null
-      doSync()
-    }, wait)
-  }
+  // 进度仅存本机（D28：云端双写下线）
+  const persist = (s: QuizSession) => saveSession(s)
 
   const restart = () => {
     Taro.showModal({
@@ -193,11 +167,32 @@ export default function Quiz() {
     persist(updated)
     track('quiz_answer', { version, qid: q.id, key: optKey, ms: answer.ms })
 
-    if (isSessionComplete(updated)) {
-      submit(updated)
-    } else {
+    // 答完最后一题不自动交卷：停在最后一题显示「提交并生成报告」，可回看修改（03 §4）
+    if (index < questions.length - 1) {
       setIndex(index + 1)
       qStartRef.current = Date.now()
+    }
+  }
+
+  /** 趣味版云端不可用时本机出报告（03 §5 降级；PRO 绝不本地伪造） */
+  const submitLocal = (s: QuizSession) => {
+    try {
+      const result = computeResult(version, s.answers)
+      const id = `local-${s.sessionId}`
+      upsertCachedReport({
+        _id: id,
+        version,
+        result,
+        sessionId: s.sessionId,
+        answers: s.answers,
+        createdAt: Date.now(),
+        dateText: formatDateTime(Date.now())
+      })
+      submittedRef.current = true
+      clearSession(version)
+      Taro.redirectTo({ url: `/pages/report/index?id=${id}` })
+    } catch {
+      Taro.showToast({ title: '生成失败，请重试', icon: 'none' })
     }
   }
 
@@ -239,7 +234,14 @@ export default function Quiz() {
         {index > 0 && (
           <view className='quiz-prev' onClick={() => setIndex(index - 1)}>上一题</view>
         )}
+        {index < questions.length - 1 && session.answers[q.id] && (
+          <view className='quiz-prev' onClick={() => setIndex(index + 1)}>下一题</view>
+        )}
       </view>
+
+      {isSessionComplete(session) && (
+        <view className='btn-primary quiz-submit' onClick={() => submit(session)}>提交并生成报告</view>
+      )}
 
       {(submitting || submitError) && (
         <view className='quiz-mask'>
@@ -254,6 +256,9 @@ export default function Quiz() {
             <view className='quiz-loading quiz-loading-col'>
               <view>提交失败，请重试</view>
               <view className='btn-primary quiz-retry' onClick={() => submit(session)}>重新提交</view>
+              {version === 'fun' && (
+                <view className='quiz-local' onClick={() => submitLocal(session)}>先在本机生成报告（仅本机可见）</view>
+              )}
             </view>
           )}
         </view>

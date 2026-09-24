@@ -8,6 +8,7 @@ import {
   clearSession,
   getCachedReports,
   getSession,
+  isSessionComplete,
   mergeCloudReports,
   questionCount
 } from '../../utils/storage'
@@ -40,7 +41,7 @@ export default function Record() {
   const openReport = (id: string) => Taro.navigateTo({ url: `/pages/report/index?id=${id}` })
 
   const continueSession = (s: QuizSession) => {
-    Taro.navigateTo({ url: `/pages/quiz/index?version=${s.version}` })
+    Taro.navigateTo({ url: `/pages/quiz/index?version=${s.version}${isSessionComplete(s) ? '&autoSubmit=1' : ''}` })
   }
 
   const removeSession = (s: QuizSession) => {
@@ -68,7 +69,9 @@ export default function Record() {
                   {s.version === 'pro' && <view className='pro-badge'>PRO</view>}
                 </view>
                 <view className='rec-session-meta'>
-                  已答 {answerCount(s)}/{questionCount(s.version)} 题 · 点击继续
+                  {isSessionComplete(s)
+                    ? '已答完 · 点击生成报告'
+                    : `已答 ${answerCount(s)}/${questionCount(s.version)} 题 · 点击继续`}
                 </view>
               </view>
               <view className='rec-session-del' onClick={() => removeSession(s)}>删除</view>
@@ -94,7 +97,10 @@ export default function Record() {
                   {r.result.archetypeName}
                   {r.result.version === 'pro' && <view className='pro-badge'>PRO</view>}
                 </view>
-                <view className='rec-item-meta'>{r.dateText || formatDateTime(r.createdAt)}</view>
+                <view className='rec-item-meta'>
+                  {r.dateText || formatDateTime(r.createdAt)}
+                  {r._id.startsWith('local-') ? ' · 仅保存在本机' : ''}
+                </view>
               </view>
               <view className='rec-item-arrow'>›</view>
             </view>

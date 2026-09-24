@@ -58,10 +58,6 @@ export async function mockCall(name: string, data: Record<string, any>): Promise
       if (!data.reportId || !['good', 'bad'].includes(data.accuracy)) return { ok: false, error: 'BAD_REQUEST' }
       return { ok: true }
 
-    case 'sessionSync':
-      // mock：本地 storage 即真相源，云端同步为空操作
-      return { ok: true }
-
     case 'track':
       // M10：mock 模式埋点为空操作
       return { ok: true }

@@ -60,6 +60,7 @@ export const HOME_COPY = {
   sub: '不是给你贴标签，而是帮你看见那些一直被忽略的天赋线索',
   cta: '开始探索我的天赋',
   ctaResume: (n: number, total: number) => `继续上次测试（第 ${n}/${total} 题）`,
+  ctaSubmit: '生成上次测试报告',
   meta: '趣味版约 2 分钟起 · 隐私保护 · 即时报告',
   whyTitle: '为什么值得一测',
   why: [

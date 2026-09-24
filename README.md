@@ -1,7 +1,7 @@
 # 天赋星球（pathfinder）
 
 职业天赋测评微信小程序：趣味版免费 · PRO 深度版每次付费生成 1 份报告、永久查看（D26）。
-技术栈：Taro 4 + React 18 + TypeScript + Sass；后端为微信云开发（云函数 ×11 + 云数据库 6 集合）。
+技术栈：Taro 4 + React 18 + TypeScript + Sass；后端为微信云开发（云函数 ×10 + 云数据库 5 集合）+ 小程序虚拟支付。
 
 ## 快速开始
 
@@ -13,7 +13,7 @@ npm run build:weapp    # 生产构建（默认 mock=false；误开 mock 会构�
 
 - **mock 模式**：由构建期环境变量 `TARO_APP_MOCK` 显式注入（D4 修订），无需云端即可跑通全流程（含模拟支付）。
   显式开启生产 mock：`TARO_APP_MOCK=true npm run build:weapp`（会触发 fail-fast 抛错，属预期防护）。
-- **接真实云端**：`src/config.ts` 填 `CLOUD_ENV`；开通云开发后上传 `cloud/functions/` 下 11 个云函数；创建 6 个集合：`sessions` / `reports` / `orders` / `feedback` / `counters` / `events`。
+- **接真实云端**：`src/config.ts` 填 `CLOUD_ENV`；开通云开发后上传 `cloud/functions/` 下 10 个云函数（上传前 `npm run check:cloud`）；创建 5 个集合：`reports` / `orders` / `feedback` / `counters` / `events`。答题进度仅存本机（D28）。
 
 ## 目录结构
 
@@ -21,12 +21,13 @@ npm run build:weapp    # 生产构建（默认 mock=false；误开 mock 会构�
 src/
 ├── pages/            6 页面：home(发现) record(记录) version-select quiz pay-confirm report
 ├── components/       RadarChart（Canvas 2D 五维雷达图，点按维度出解释）
-├── utils/            scoring 计分引擎 / storage 本地会话与缓存 / cloud 云调用出口 / track 埋点出口
+├── utils/            scoring 计分引擎 / storage 本机会话与缓存 / cloud 云调用出口 / pay 虚拟支付 / track 埋点出口
 ├── data/             题库 ×2 / archetypes / careers / copy 文案库 / agreements 协议 / types
 ├── mock/             mock 云函数实现（同签名切换）
-└── config.ts         CLOUD_ENV / TARO_APP_MOCK / 双渠道价格 / PAY_IOS_MODE
+└── config.ts         CLOUD_ENV / TARO_APP_MOCK（构建期 + 运行时双防线）/ 按平台展示价
 cloud/functions/      login getStats submitTest getReports createOrder payCallback
-                      checkOrder submitFeedback deleteMyData sessionSync track
+                      checkOrder submitFeedback deleteMyData track
+cloud/shared/         云函数共享模块唯一源（xpay 签名查单 / 埋点白名单），npm run sync:cloud 复制进各函数
 ```
 
 ## 关键设计

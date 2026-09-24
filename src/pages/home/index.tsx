@@ -31,10 +31,10 @@ export default function Home() {
 
   useDidShow(() => {
     track('home_view')
-    // 双会话规则：取 updatedAt 最新的未完成会话作为「继续」目标；次要入口在记录页
+    // 双会话规则：取 updatedAt 最新的本机会话作为主按钮目标（含已答完未交卷）；次要入口在记录页
     const candidates = (['fun', 'pro'] as Version[])
       .map(v => ({ version: v, session: getSession(v) }))
-      .filter((x): x is { version: Version; session: QuizSession } => !!x.session && !isSessionComplete(x.session))
+      .filter((x): x is { version: Version; session: QuizSession } => !!x.session)
     candidates.sort((a, b) => b.session.updatedAt - a.session.updatedAt)
     setResume(candidates[0] || null)
 
@@ -50,9 +50,10 @@ export default function Home() {
   }
 
   const onCta = () => {
-    track('home_cta_tap', { mode: resume ? 'resume' : 'start', version: resume?.version })
+    const complete = !!resume && isSessionComplete(resume.session)
+    track('home_cta_tap', { mode: complete ? 'submit' : resume ? 'resume' : 'start', version: resume?.version })
     if (resume) {
-      Taro.navigateTo({ url: `/pages/quiz/index?version=${resume.version}` })
+      Taro.navigateTo({ url: `/pages/quiz/index?version=${resume.version}${complete ? '&autoSubmit=1' : ''}` })
     } else {
       Taro.navigateTo({ url: '/pages/version-select/index' })
     }
@@ -92,7 +93,9 @@ export default function Home() {
     })
   }
 
-  const ctaText = resume
+  const ctaText = resume && isSessionComplete(resume.session)
+    ? HOME_COPY.ctaSubmit
+    : resume
     ? HOME_COPY.ctaResume(Math.min(answerCount(resume.session) + 1, questionCount(resume.version)), questionCount(resume.version))
     : HOME_COPY.cta
 
