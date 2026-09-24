@@ -1,0 +1,259 @@
+.report {
+  padding: 40px 32px 64px;
+}
+
+.rep-head {
+  text-align: center;
+  padding: 24px 0 40px;
+}
+
+.rep-name {
+  font-size: 56px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+
+.rep-slogan {
+  margin-top: 16px;
+  font-size: 26px;
+  color: var(--c-sub);
+}
+
+.rep-tier {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 8px 24px;
+  border-radius: 24px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.rep-date {
+  margin-top: 16px;
+  font-size: 22px;
+  color: var(--c-sub);
+}
+
+.section-title {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.rep-radar {
+  padding-bottom: 24px;
+}
+
+.rep-radar-tip {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 20px;
+  color: var(--c-sub);
+}
+
+.rep-insight {
+  margin-top: 32px;
+}
+
+.rep-insight-text {
+  font-size: 27px;
+  line-height: 1.8;
+}
+
+.rep-dims,
+.rep-careers,
+.rep-advice {
+  margin-top: 32px;
+}
+
+.dim-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+
+  & + .dim-row {
+    border-top: 1px solid var(--c-line);
+  }
+}
+
+.dim-label {
+  width: 96px;
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.dim-bar {
+  flex: 1;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--c-line);
+  overflow: hidden;
+  margin: 0 20px;
+}
+
+.dim-bar-inner {
+  height: 100%;
+  border-radius: 7px;
+  background: linear-gradient(90deg, #8B5CF6, #6D28D9);
+}
+
+.dim-score {
+  width: 56px;
+  font-size: 25px;
+  font-weight: 700;
+  color: var(--c-primary-deep);
+}
+
+.dim-level {
+  width: 108px;
+  text-align: right;
+  font-size: 21px;
+
+  &.lv-high { color: #16A34A; }
+  &.lv-mid { color: var(--c-primary-deep); }
+  &.lv-low { color: var(--c-sub); }
+}
+
+.career-item {
+  display: flex;
+  align-items: center;
+  padding: 20px 0;
+
+  & + .career-item {
+    border-top: 1px solid var(--c-line);
+  }
+}
+
+.career-rank {
+  flex-shrink: 0;
+  width: 84px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--c-primary);
+}
+
+.career-main {
+  flex: 1;
+}
+
+.career-name {
+  font-size: 29px;
+  font-weight: 600;
+}
+
+.career-reason {
+  margin-top: 6px;
+  font-size: 22px;
+  color: var(--c-sub);
+}
+
+.career-tier {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border-radius: 20px;
+  background: var(--c-primary-soft);
+  color: var(--c-primary-deep);
+  font-size: 21px;
+}
+
+.rep-footnote {
+  margin-top: 20px;
+  font-size: 20px;
+  color: var(--c-sub);
+}
+
+.advice-item {
+  display: flex;
+  padding: 12px 0;
+}
+
+.advice-label {
+  flex-shrink: 0;
+  width: 140px;
+  font-weight: 600;
+  color: var(--c-primary-deep);
+}
+
+.advice-text {
+  flex: 1;
+  font-size: 25px;
+  line-height: 1.7;
+}
+
+.rep-upsell {
+  margin-top: 40px;
+  border: 2px solid var(--c-primary);
+}
+
+.upsell-title {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.upsell-desc {
+  margin-top: 14px;
+  font-size: 24px;
+  color: var(--c-sub);
+  line-height: 1.7;
+}
+
+.upsell-btn {
+  margin-top: 24px;
+  height: 80px;
+}
+
+.rep-disclaimer {
+  margin-top: 40px;
+}
+
+.explain-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(31, 35, 51, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.explain-panel {
+  width: 580px;
+  background: #fff;
+  border-radius: 24px;
+  padding: 40px 36px 32px;
+}
+
+.explain-name {
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.explain-score {
+  margin-left: 16px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--c-primary-deep);
+}
+
+.explain-text {
+  margin-top: 20px;
+  font-size: 25px;
+  line-height: 1.8;
+}
+
+.explain-behavior {
+  margin-top: 14px;
+  font-size: 24px;
+  color: var(--c-sub);
+  line-height: 1.7;
+}
+
+.explain-close {
+  margin-top: 28px;
+  height: 80px;
+}

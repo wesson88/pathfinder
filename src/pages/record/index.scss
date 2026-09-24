@@ -1,0 +1,96 @@
+.record {
+  padding: 40px 32px 64px;
+}
+
+.rec-title {
+  font-size: 30px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.rec-sessions {
+  margin-bottom: 32px;
+}
+
+.rec-session {
+  display: flex;
+  align-items: center;
+  padding: 20px 0;
+
+  & + .rec-session {
+    border-top: 1px solid var(--c-line);
+  }
+}
+
+.rec-session-main {
+  flex: 1;
+}
+
+.rec-session-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.rec-session-meta {
+  margin-top: 8px;
+  font-size: 22px;
+  color: var(--c-primary-deep);
+}
+
+.rec-session-del {
+  padding: 10px 20px;
+  font-size: 22px;
+  color: var(--c-sub);
+}
+
+.rec-empty {
+  text-align: center;
+  padding: 160px 40px;
+}
+
+.rec-empty-emoji {
+  font-size: 88px;
+}
+
+.rec-empty-text {
+  margin-top: 32px;
+  font-size: 26px;
+  color: var(--c-sub);
+  line-height: 1.7;
+}
+
+.rec-item {
+  display: flex;
+  align-items: center;
+  padding: 24px 0;
+
+  & + .rec-item {
+    border-top: 1px solid var(--c-line);
+  }
+}
+
+.rec-item-main {
+  flex: 1;
+}
+
+.rec-item-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 29px;
+  font-weight: 600;
+}
+
+.rec-item-meta {
+  margin-top: 8px;
+  font-size: 22px;
+  color: var(--c-sub);
+}
+
+.rec-item-arrow {
+  font-size: 40px;
+  color: var(--c-line);
+}

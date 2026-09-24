@@ -1,0 +1,129 @@
+.pay {
+  padding: 40px 32px 64px;
+}
+
+.pay-name {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.pay-price {
+  margin-top: 16px;
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--c-primary-deep);
+}
+
+.pay-meta {
+  margin-top: 8px;
+  font-size: 24px;
+  color: var(--c-sub);
+}
+
+.pay-feats {
+  margin-top: 28px;
+}
+
+.feat {
+  position: relative;
+  padding: 8px 0 8px 36px;
+  font-size: 25px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 18px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--c-primary);
+  }
+}
+
+.pay-agree {
+  display: flex;
+  align-items: flex-start;
+  margin: 32px 8px;
+}
+
+.pay-checkbox {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--c-line);
+  margin: 4px 16px 0 0;
+  box-sizing: border-box;
+
+  &.on {
+    background: var(--c-primary) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>') center/20px no-repeat;
+    border-color: var(--c-primary);
+  }
+}
+
+.pay-agree-text {
+  font-size: 23px;
+  color: var(--c-sub);
+  line-height: 1.7;
+}
+
+.pay-link {
+  color: var(--c-primary-deep);
+  text-decoration: underline;
+}
+
+.pay-btn {
+  margin-top: 16px;
+}
+
+.pay-note {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 22px;
+  color: var(--c-sub);
+}
+
+.agree-mask {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(31, 35, 51, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.agree-panel {
+  width: 600px;
+  max-height: 75vh;
+  background: #fff;
+  border-radius: 24px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.agree-title {
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.agree-body {
+  flex: 1;
+  margin-top: 24px;
+  font-size: 23px;
+  line-height: 1.8;
+  color: var(--c-text);
+  white-space: pre-wrap;
+  max-height: 56vh;
+}
+
+.agree-close {
+  margin-top: 28px;
+  height: 80px;
+}

@@ -1,0 +1,81 @@
+.vs {
+  padding: 40px 32px 64px;
+}
+
+.vs-tip {
+  text-align: center;
+  font-size: 26px;
+  color: var(--c-sub);
+  margin-bottom: 32px;
+}
+
+.vcard {
+  transition: transform 0.15s;
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.pro {
+    border: 2px solid var(--c-primary);
+  }
+}
+
+.vcard-head {
+  display: flex;
+  align-items: center;
+}
+
+.vcard-name {
+  font-size: 36px;
+  font-weight: 700;
+  margin-right: 16px;
+}
+
+.vcard-price {
+  margin-left: auto;
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--c-primary-deep);
+
+  &.free {
+    color: #16A34A;
+    font-size: 32px;
+  }
+}
+
+.vcard-meta {
+  margin-top: 12px;
+  font-size: 24px;
+  color: var(--c-sub);
+}
+
+.vcard-feats {
+  margin: 24px 0;
+}
+
+.feat {
+  position: relative;
+  padding: 8px 0 8px 36px;
+  font-size: 25px;
+  color: var(--c-text);
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 18px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--c-primary);
+  }
+}
+
+.vcard-btn {
+  margin-top: 8px;
+}
+
+.vs-disclaimer {
+  margin-top: 40px;
+}
