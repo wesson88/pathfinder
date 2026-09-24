@@ -52,7 +52,11 @@ export default function PayConfirm() {
           })
       })
       .then(result => {
-        if (result === 'canceled') return
+        if (result === 'canceled') {
+          // 用户取消：复位支付态，允许原地重试（盲审修复：原漏复位导致按钮永久锁死）
+          setPaying(false)
+          return
+        }
         if (result === true) {
           track('pay_success', { mock: isMockMode() })
           Taro.redirectTo({ url: '/pages/quiz/index?version=pro' })

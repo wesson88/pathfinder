@@ -1,6 +1,5 @@
 import Taro from '@tarojs/taro'
-import { QUESTIONS_FUN } from '../data/questions-fun'
-import { QUESTIONS_PRO } from '../data/questions-pro'
+import { bankOf } from '../data/banks'
 import { QuizSession, ReportItem, Version } from '../data/types'
 
 const KEY_SESSION = (v: Version) => `ct_session_${v}`
@@ -17,8 +16,7 @@ const get = <T,>(key: string, fallback: T): T => {
   }
 }
 
-export const questionCount = (version: Version) =>
-  version === 'pro' ? QUESTIONS_PRO.length : QUESTIONS_FUN.length
+export const questionCount = (version: Version) => bankOf(version).length
 
 /* ---------------- 答题会话（本地为主，云端经 sessionSync 双写） ---------------- */
 
@@ -60,14 +58,14 @@ export const answerCount = (session: QuizSession | null) =>
 
 /** 第一个未作答的题目下标；全部答完返回最后一题 */
 export function firstUnansweredIndex(session: QuizSession, version: Version) {
-  const questions = version === 'pro' ? QUESTIONS_PRO : QUESTIONS_FUN
+  const questions = bankOf(version)
   const idx = questions.findIndex(q => !session.answers[q.id])
   return idx === -1 ? questions.length - 1 : idx
 }
 
 export const isSessionComplete = (session: QuizSession | null) => {
   if (!session) return false
-  const questions = session.version === 'pro' ? QUESTIONS_PRO : QUESTIONS_FUN
+  const questions = bankOf(session.version)
   // 逐题校验而非键数统计：混入无效 qid 的脏数据不算完成（盲审修订）
   return questions.every(q => !!session.answers[q.id])
 }
@@ -92,6 +90,23 @@ export function replaceCachedReports(list: ReportItem[]) {
 
 export function findCachedReport(id: string): ReportItem | null {
   return getCachedReports().find(r => r._id === id) || null
+}
+
+/** createdAt 统一转毫秒（云端存数值、mock 存 ISO 字符串） */
+const createdAtMs = (r: ReportItem) =>
+  typeof r.createdAt === 'number' ? r.createdAt : Date.parse(String(r.createdAt)) || 0
+
+/**
+ * 云端报告合并进本地缓存：去重 + 按创建时间倒序持久化
+ * （报告页云端兜底 / 记录页刷新共用；盲审修复：原「本地在前」的拼接会让列表乱序）
+ */
+export function mergeCloudReports(cloudReports: ReportItem[]): ReportItem[] {
+  const merged = [...getCachedReports(), ...(cloudReports || [])].filter(
+    (v, i, a) => a.findIndex(x => x._id === v._id) === i
+  )
+  merged.sort((a, b) => createdAtMs(b) - createdAtMs(a))
+  replaceCachedReports(merged)
+  return merged
 }
 
 /* ---------------- Mock 专用：模拟 PRO 解锁状态 ---------------- */

@@ -3,7 +3,7 @@ import { callCloud } from './cloud'
 
 /**
  * 埋点统一出口（M10 / D22）：轻量自建，fire-and-forget，失败静默，绝不阻塞用户操作。
- * 事件数据云端保留 12 个月（到期聚合删除，见 track 云函数）。
+ * 事件数据云端保留 12 个月（到期由 track 云函数惰性清理）。
  * mock 模式下为空操作（见 mock/index.ts）。
  */
 export type TrackEvent =

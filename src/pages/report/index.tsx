@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import RadarChart from '../../components/RadarChart'
-import { PAY_IOS_MODE } from '../../config'
+import { isIosPayHidden } from '../../config'
 import {
   archetypeTier,
   careerTier,
@@ -17,7 +17,8 @@ import { REPORT_DISCLAIMER } from '../../data/agreements'
 import { ReportItem } from '../../data/types'
 import { DIM_META, DIM_ORDER } from '../../data/archetypes'
 import { callCloud } from '../../utils/cloud'
-import { findCachedReport, getCachedReports, replaceCachedReports } from '../../utils/storage'
+import { formatDateTime } from '../../utils/format'
+import { findCachedReport, mergeCloudReports } from '../../utils/storage'
 import { track } from '../../utils/track'
 import { DimKey } from '../../data/types'
 import './index.scss'
@@ -51,15 +52,19 @@ export default function Report() {
     if (loaded) return
     callCloud<{ reports: ReportItem[] }>('getReports')
       .then(r => {
-        const merged = [...getCachedReports(), ...(r.reports || [])].filter(
-          (v, i, a) => a.findIndex(x => x._id === v._id) === i
-        )
-        replaceCachedReports(merged)
+        mergeCloudReports(r.reports || [])
         const hit = findCachedReport(id)
         setReport(hit)
-        if (!hit) Taro.redirectTo({ url: '/pages/home/index' })
+        if (!hit) {
+          // home 是 tabBar 页，redirectTo 不允许跳转（盲审修复），须用 switchTab
+          Taro.showToast({ title: '报告不存在或已过期', icon: 'none' })
+          Taro.switchTab({ url: '/pages/home/index' })
+        }
       })
-      .catch(() => Taro.redirectTo({ url: '/pages/home/index' }))
+      .catch(() => {
+        Taro.showToast({ title: '报告加载失败', icon: 'none' })
+        Taro.switchTab({ url: '/pages/home/index' })
+      })
       .finally(() => setLoaded(true))
   }, [loaded])
 
@@ -67,7 +72,7 @@ export default function Report() {
   const r = report.result
   const isPro = r.version === 'pro'
   // iOS hidden 铁律同样适用于报告页的 PRO 转化卡：整卡不展示
-  const upsellVisible = !isPro && !(Taro.getDeviceInfo().platform === 'ios' && PAY_IOS_MODE === 'hidden')
+  const upsellVisible = !isPro && !isIosPayHidden()
 
   return (
     <view className='report'>
@@ -78,7 +83,7 @@ export default function Report() {
         {isPro && r.archetypeMatch != null && (
           <view className='rep-tier'>原型匹配：{archetypeTier(r.archetypeMatch)}</view>
         )}
-        <view className='rep-date'>{report.dateText}</view>
+        <view className='rep-date'>{report.dateText || formatDateTime(report.createdAt)}</view>
       </view>
 
       <view className='card rep-radar'>

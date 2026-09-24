@@ -1,14 +1,10 @@
-import { QUESTIONS_FUN } from '../data/questions-fun'
-import { QUESTIONS_PRO } from '../data/questions-pro'
+import { bankOf } from '../data/banks'
 import { ARCHETYPES, DIM_META, DIM_ORDER, FUN_TITLES } from '../data/archetypes'
 import { CAREERS, careerTopDims } from '../data/careers'
 import { AnswerValue, DimKey, DimScores, Question, TestResult, Version } from '../data/types'
 
 /** 题库版本号：题库任何改动都要递增，报告按此存档（M7 迭代闭环） */
 export const BANK_VERSION = 'v1.0'
-
-const bank = (version: Version): Question[] =>
-  version === 'pro' ? QUESTIONS_PRO : QUESTIONS_FUN
 
 /** 兼容 string 与 {key, ms} 两种作答值 */
 const keyOf = (v: AnswerValue | string | undefined) =>
@@ -79,7 +75,7 @@ export function computeResult(
   version: Version,
   answers: Record<string, AnswerValue>
 ): TestResult {
-  const questions = bank(version)
+  const questions = bankOf(version)
 
   // 完成度守门（盲审修订）：空卷/半卷不允许生成报告，逐题校验而非键数统计
   const unanswered = questions.filter(q => !answers[q.id])

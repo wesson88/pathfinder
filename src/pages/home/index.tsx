@@ -6,6 +6,7 @@ import {
   answerCount,
   clearAllLocal,
   getSession,
+  isSessionComplete,
   questionCount
 } from '../../utils/storage'
 import { track } from '../../utils/track'
@@ -24,9 +25,10 @@ export default function Home() {
   useDidShow(() => {
     track('home_view')
     // 双会话规则：取 updatedAt 最新的未完成会话作为「继续」目标；次要入口在记录页
+    // 完成度判定与 quiz/submitTest 同源（盲审修复：原 isDone 键数统计会放过脏数据会话）
     const candidates = (['fun', 'pro'] as Version[])
       .map(v => ({ version: v, session: getSession(v) }))
-      .filter((x): x is { version: Version; session: QuizSession } => !!x.session && !isDone(x.session))
+      .filter((x): x is { version: Version; session: QuizSession } => !!x.session && !isSessionComplete(x.session))
     candidates.sort((a, b) => b.session.updatedAt - a.session.updatedAt)
     setResume(candidates[0] || null)
 
@@ -34,8 +36,6 @@ export default function Home() {
       .then(r => setReportsTotal(r.reportsTotal || 0))
       .catch(() => setReportsTotal(0))
   })
-
-  const isDone = (s: QuizSession) => answerCount(s) >= questionCount(s.version)
 
   const onCta = () => {
     track('home_cta_click', { resume: !!resume, version: resume?.version })
@@ -49,16 +49,18 @@ export default function Home() {
   const onClearData = () => {
     Taro.showModal({
       title: '清除我的数据',
-      content: '将删除本机与云端的答题记录、报告与行为数据（订单将匿名化保留），确定吗？',
+      content: '将删除本机与云端的答题记录、报告与行为数据（订单将匿名化留存，已支付的权益不受影响），确定吗？',
       confirmText: '清除',
       confirmColor: '#6D28D9',
       success: (r) => {
         if (!r.confirm) return
         clearAllLocal()
-        callCloud('deleteMyData').catch(() => { /* 云端失败不阻塞，本机已清 */ })
         Taro.showToast({ title: '已清除', icon: 'success' })
-        track('data_delete')
         setResume(null)
+        // 删除成功后再补记埋点（盲审修复竞态：先记会被本次 deleteMyData 的 events 清空吞掉）
+        callCloud('deleteMyData')
+          .then(() => track('data_delete'))
+          .catch(() => { /* 云端失败不阻塞，本机已清 */ })
       }
     })
   }

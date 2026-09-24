@@ -152,6 +152,11 @@
   font-size: 26px;
 }
 
+/* 提交失败态：文字 + 重试按钮上下排列 */
+.quiz-loading-col {
+  flex-direction: column;
+}
+
 .quiz-loading-dot {
   width: 18px;
   height: 18px;

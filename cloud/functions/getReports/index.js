@@ -9,6 +9,8 @@ exports.main = async () => {
   try {
     const q = await db.collection('reports')
       .where({ openid: OPENID })
+      // 列表/展示不需要原始答卷，project 掉 answers 减少下行流量
+      .field({ answers: false })
       .orderBy('createdAt', 'desc')
       .limit(20)
       .get()

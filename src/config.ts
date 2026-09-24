@@ -1,6 +1,7 @@
 /**
  * 全局配置
  */
+import Taro from '@tarojs/taro'
 
 /** 云开发环境 ID：开通云开发后，从「云开发控制台 → 设置 → 环境ID」复制到这里 */
 export const CLOUD_ENV = ''
@@ -25,5 +26,9 @@ export const PRICE_PRO_IOS_FEN = 100
 
 /** iOS 虚拟支付模式：'hidden' = 未开通 IAP，PRO 卡片在 iOS 整体不展示；'iap' = 已开通（M4 §3） */
 export const PAY_IOS_MODE: 'hidden' | 'iap' = 'hidden'
+
+/** iOS 未开通虚拟支付：PRO 相关入口整体隐藏（M4 §3 铁律）。页面统一用此判定，勿各自拼 platform 判断 */
+export const isIosPayHidden = () =>
+  Taro.getDeviceInfo().platform === 'ios' && PAY_IOS_MODE === 'hidden'
 
 export const formatPrice = (fen: number) => `¥${(fen / 100).toFixed(2)}`

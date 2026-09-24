@@ -2,13 +2,14 @@ import { useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { ReportItem, QuizSession, Version } from '../../data/types'
 import { callCloud } from '../../utils/cloud'
+import { formatDateTime } from '../../utils/format'
 import {
   answerCount,
   clearSession,
   getCachedReports,
   getSession,
-  questionCount,
-  replaceCachedReports
+  mergeCloudReports,
+  questionCount
 } from '../../utils/storage'
 import { track } from '../../utils/track'
 import './index.scss'
@@ -33,12 +34,7 @@ export default function Record() {
     // 云端刷新兜底（本地缓存优先展示，静默合并）
     callCloud<{ reports: ReportItem[] }>('getReports')
       .then(r => {
-        if (!r.reports?.length) return
-        const merged = [...getCachedReports(), ...r.reports].filter(
-          (v, i, a) => a.findIndex(x => x._id === v._id) === i
-        )
-        replaceCachedReports(merged)
-        setReports(getCachedReports())
+        if (r.reports?.length) setReports(mergeCloudReports(r.reports))
       })
       .catch(() => { /* 离线可用 */ })
   })
@@ -101,7 +97,7 @@ export default function Record() {
                   {r.result.archetypeName}
                   {r.result.version === 'pro' && <view className='pro-badge'>PRO</view>}
                 </view>
-                <view className='rec-item-meta'>{r.dateText || String(r.createdAt)}</view>
+                <view className='rec-item-meta'>{r.dateText || formatDateTime(r.createdAt)}</view>
               </view>
               <view className='rec-item-arrow'>›</view>
             </view>

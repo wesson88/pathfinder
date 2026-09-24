@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Taro, { useRouter } from '@tarojs/taro'
-import { QUESTIONS_FUN } from '../../data/questions-fun'
-import { QUESTIONS_PRO } from '../../data/questions-pro'
-import { AnswerValue, Question, QuizSession, Version } from '../../data/types'
+import { bankOf } from '../../data/banks'
+import { AnswerValue, QuizSession, Version } from '../../data/types'
 import { callCloud, isMockMode } from '../../utils/cloud'
 import { formatDateTime } from '../../utils/format'
 import { computeResult } from '../../utils/scoring'
@@ -19,7 +18,8 @@ import {
 import { track } from '../../utils/track'
 import './index.scss'
 
-const bankOf = (v: Version): Question[] => (v === 'pro' ? QUESTIONS_PRO : QUESTIONS_FUN)
+/** 云端进度同步最小间隔：答题期间至多每 5s 一次，尾随补发最新一帧 */
+const SYNC_MIN_INTERVAL = 5000
 
 export default function Quiz() {
   const router = useRouter()
@@ -32,6 +32,9 @@ export default function Quiz() {
   const [submitError, setSubmitError] = useState(false)
   const qStartRef = useRef(Date.now())
   const initedRef = useRef(false)
+  const lastSyncRef = useRef(0)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestRef = useRef<QuizSession | null>(null)
 
   // 初始化会话：进度恢复 / 新建（useEffect 保证副作用只在挂载后发生）
   useEffect(() => {
@@ -58,10 +61,29 @@ export default function Quiz() {
     qStartRef.current = Date.now()
   }, [])
 
-  const persist = (s: QuizSession) => {
-    saveSession(s)
+  const doSync = () => {
+    const s = latestRef.current
+    if (!s) return
+    latestRef.current = null
+    lastSyncRef.current = Date.now()
     // 云端进度双写（M3）：fire-and-forget，失败不影响答题
     callCloud('sessionSync', { session: s }).catch(() => { /* ignore */ })
+  }
+
+  const persist = (s: QuizSession) => {
+    saveSession(s)
+    // 节流双写（盲审修复：原每题一次云写）：≥SYNC_MIN_INTERVAL 一次，待发期间只更新最新帧
+    latestRef.current = s
+    if (syncTimerRef.current) return
+    const wait = SYNC_MIN_INTERVAL - (Date.now() - lastSyncRef.current)
+    if (wait <= 0) {
+      doSync()
+      return
+    }
+    syncTimerRef.current = setTimeout(() => {
+      syncTimerRef.current = null
+      doSync()
+    }, wait)
   }
 
   const restart = () => {
@@ -194,14 +216,20 @@ export default function Quiz() {
         )}
       </view>
 
-      {submitting && (
+      {(submitting || submitError) && (
         <view className='quiz-mask'>
-          <view className='quiz-loading'>
-            <view className='quiz-loading-dot' />
-            <view>正在生成你的报告…</view>
-          </view>
+          {submitting && !submitError && (
+            <view className='quiz-loading'>
+              <view className='quiz-loading-dot' />
+              <view>正在生成你的报告…</view>
+            </view>
+          )}
           {submitError && (
-            <view className='btn-primary quiz-retry' onClick={() => submit(session)}>提交失败，点击重试</view>
+            // 盲审修复：原按钮只在 submitting 内渲染，而错误路径必先复位 submitting，永不出现
+            <view className='quiz-loading quiz-loading-col'>
+              <view>提交失败，请重试</view>
+              <view className='btn-primary quiz-retry' onClick={() => submit(session)}>重新提交</view>
+            </view>
           )}
         </view>
       )}

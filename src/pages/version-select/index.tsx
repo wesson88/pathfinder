@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Taro, { useDidShow } from '@tarojs/taro'
-import { PAY_IOS_MODE, PRICE_PRO_FEN, formatPrice } from '../../config'
+import { isIosPayHidden, PRICE_PRO_FEN, formatPrice } from '../../config'
 import { callCloud } from '../../utils/cloud'
 import { getSession } from '../../utils/storage'
 import { track } from '../../utils/track'
@@ -9,8 +9,7 @@ import './index.scss'
 
 export default function VersionSelect() {
   // M4 §3 铁律：iOS 未开通虚拟支付时，PRO 卡片整体不展示（绝不出现「去安卓解锁」类引导）
-  const isIOS = Taro.getDeviceInfo().platform === 'ios'
-  const proVisible = !(isIOS && PAY_IOS_MODE === 'hidden')
+  const proVisible = !isIosPayHidden()
   const [checking, setChecking] = useState(false)
 
   useDidShow(() => track('version_view'))
