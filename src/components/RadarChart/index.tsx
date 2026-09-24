@@ -106,7 +106,7 @@ export default function RadarChart({ scores, labels, size = 320, onTapDim }: Pro
           ctx.fill()
         })
 
-        // 维度标签（分数 + 名称）
+        // 维度标签（只标名称不标数字：v2 雷达是相对自身的形状，不是分数，06 §4）
         ctx.fillStyle = '#1F2333'
         ctx.font = '600 12px sans-serif'
         ctx.textAlign = 'center'
@@ -115,12 +115,7 @@ export default function RadarChart({ scores, labels, size = 320, onTapDim }: Pro
           const a = angleOf(i)
           const x = cx + Math.cos(a) * labelRadius
           const y = cy + Math.sin(a) * labelRadius
-          ctx.fillText(labels[i] || dim, x, y - 8)
-          ctx.fillStyle = '#7C5CFC'
-          ctx.font = '700 14px sans-serif'
-          ctx.fillText(String(scores[dim] || 0), x, y + 10)
-          ctx.fillStyle = '#1F2333'
-          ctx.font = '600 12px sans-serif'
+          ctx.fillText(labels[i] || dim, x, y)
         })
       })
   }, [scores, labels, size])

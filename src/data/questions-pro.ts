@@ -4,13 +4,13 @@ import { Question } from './types'
  * PRO 专业版题库：12 题 = 情境四选一 ×10（单维映射 3 分）+ 迫选二选一 ×2（胜方 2 分）。
  * 覆盖矩阵与分类分布见项目记录《13-题库工程规范-代码侧》§4。
  * v1.1（盲审修订）：pro-11/12 改行为化迫选；pro-01/03/09 洞察选项降赞许性（对齐出题规则 3/4）。
+ * 二轮盲审：删除四选一题「本题用于评估…」提示（暴露测量意图会加剧赞许性作答，02 §4）；题面与计分不变。
  */
 export const QUESTIONS_PRO: Question[] = [
   {
     id: 'pro-01',
     type: 'single',
     category: '职业行为偏好',
-    hint: '本题用于评估模糊情境下的切入方式',
     question: '接到一个目标模糊的新任务，你通常会先？',
     options: [
       { key: 'A', text: '先梳理清楚任务的要求和限制', scores: { insight: 3 } },
@@ -23,7 +23,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-02',
     type: 'single',
     category: '职业行为偏好',
-    hint: '本题用于评估你在团队中的自然角色',
     question: '团队讨论时，你更常扮演哪种角色？',
     options: [
       { key: 'A', text: '提出大家没想到的新角度', scores: { creativity: 3 } },
@@ -36,7 +35,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-03',
     type: 'single',
     category: '学习与决策',
-    hint: '本题用于评估你的学习方式',
     question: '要快速搞懂一个陌生领域，你会？',
     options: [
       { key: 'A', text: '先理清这个领域的整体框架和脉络', scores: { insight: 3 } },
@@ -49,7 +47,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-04',
     type: 'single',
     category: '学习与决策',
-    hint: '本题用于评估你的决策风格',
     question: '两个方向都不错的方案摆在面前，你会？',
     options: [
       { key: 'A', text: '列出关键判断标准，逐项权衡', scores: { insight: 3 } },
@@ -62,7 +59,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-05',
     type: 'single',
     category: '协作与沟通',
-    hint: '本题用于评估僵局中的自然反应',
     question: '项目讨论陷入僵局时，你更可能？',
     options: [
       { key: 'A', text: '重新定义问题，点出大家真正在争什么', scores: { insight: 3 } },
@@ -75,7 +71,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-06',
     type: 'single',
     category: '协作与沟通',
-    hint: '本题用于评估你对团队的支持方式',
     question: '新同事融入团队比较慢，你会？',
     options: [
       { key: 'A', text: '观察他卡在哪里，帮他找到问题根源', scores: { insight: 3 } },
@@ -88,7 +83,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-07',
     type: 'single',
     category: '能量与韧性',
-    hint: '本题用于评估你的内在驱动力来源',
     question: '连续高强度推进项目，最能给你充电的是？',
     options: [
       { key: 'A', text: '冒出越来越多的新想法', scores: { creativity: 3 } },
@@ -101,7 +95,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-08',
     type: 'single',
     category: '能量与韧性',
-    hint: '本题用于评估你的恢复方式',
     question: '搞砸了一件事，你恢复的方式更接近？',
     options: [
       { key: 'A', text: '把原因拆透，沉淀成下次能用的方法', scores: { insight: 3 } },
@@ -114,7 +107,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-09',
     type: 'single',
     category: '职业行为偏好',
-    hint: '本题用于评估长期规划中的依赖项',
     question: '做一份重要的长期规划时，你更依赖？',
     options: [
       { key: 'A', text: '对行业走向的观察和判断', scores: { insight: 3 } },
@@ -127,7 +119,6 @@ export const QUESTIONS_PRO: Question[] = [
     id: 'pro-10',
     type: 'single',
     category: '学习与决策',
-    hint: '本题用于评估你的复盘视角',
     question: '复盘一个成功的项目，你更想深挖？',
     options: [
       { key: 'A', text: '成功背后可复制的规律', scores: { insight: 3 } },

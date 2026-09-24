@@ -3,13 +3,14 @@ import Taro, { useRouter, useShareAppMessage } from '@tarojs/taro'
 import RadarChart from '../../components/RadarChart'
 import { isIosPayHidden } from '../../config'
 import {
-  archetypeTier,
-  careerTier,
   DIM_EXPLAIN,
   DIM_LEVEL,
+  legacyArchetypeTier,
+  legacyCareerTier,
   levelOf,
   LEVEL_LABEL,
   MATCH_FOOTNOTE,
+  RADAR_NOTE,
   UPSELL_COPY,
   upsellDesc
 } from '../../data/copy'
@@ -73,6 +74,9 @@ export default function Report() {
   const isPro = r.version === 'pro'
   // iOS hidden 铁律同样适用于报告页的 PRO 转化卡：整卡不展示
   const upsellVisible = !isPro && !isIosPayHidden()
+  // v2 结果自带档位；v1 旧报告按旧百分比换算（不迁移，M7 版本化）
+  const archetypeTierText =
+    r.archetypeTier || (r.archetypeMatch != null ? legacyArchetypeTier(r.archetypeMatch) : '')
 
   return (
     <view className='report'>
@@ -80,20 +84,22 @@ export default function Report() {
         {isPro && <view className='pro-badge'>PRO</view>}
         <view className='rep-name'>{r.archetypeName}</view>
         <view className='rep-slogan'>{r.slogan}</view>
-        {isPro && r.archetypeMatch != null && (
-          <view className='rep-tier'>原型匹配：{archetypeTier(r.archetypeMatch)}</view>
-        )}
+        {isPro && archetypeTierText && <view className='rep-tier'>原型匹配：{archetypeTierText}</view>}
         <view className='rep-date'>{report.dateText || formatDateTime(report.createdAt)}</view>
       </view>
 
       <view className='card rep-radar'>
         <RadarChart scores={r.scores} labels={r.radarLabels || DIM_ORDER.map(d => DIM_META[d].label)} onTapDim={setExplainDim} />
         <view className='rep-radar-tip'>点按雷达图维度，看这条天赋的解释</view>
+        <view className='rep-footnote'>{RADAR_NOTE}</view>
       </view>
 
       <view className='card rep-insight'>
         <view className='section-title'>核心洞察</view>
         <view className='rep-insight-text'>{r.coreInsight}</view>
+        {r.mirror && r.mirror.map(line => (
+          <view key={line} className='rep-mirror'>{line}</view>
+        ))}
       </view>
 
       <view className='card rep-dims'>
@@ -107,7 +113,6 @@ export default function Report() {
               <view className='dim-bar'>
                 <view className='dim-bar-inner' style={{ width: `${score}%` }} />
               </view>
-              <view className='dim-score'>{score}</view>
               <view className={`dim-level lv-${level}`}>{LEVEL_LABEL[level]}</view>
             </view>
           )
@@ -124,7 +129,7 @@ export default function Report() {
                 <view className='career-name'>{c.name}</view>
                 <view className='career-reason'>{c.reason}</view>
               </view>
-              <view className='career-tier'>{careerTier(c.percent)}</view>
+              <view className='career-tier'>{c.tier || (c.percent != null ? legacyCareerTier(c.percent) : '')}</view>
             </view>
           ))}
           <view className='rep-footnote'>{MATCH_FOOTNOTE}</view>
@@ -160,9 +165,7 @@ export default function Report() {
           <view className='explain-panel' onClick={(e) => e.stopPropagation()}>
             <view className='explain-name'>
               {DIM_META[explainDim].label}
-              <text className='explain-score'>
-                {r.scores[explainDim]} · {LEVEL_LABEL[levelOf(r.scores[explainDim])]}
-              </text>
+              <text className='explain-score'>{LEVEL_LABEL[levelOf(r.scores[explainDim])]}</text>
             </view>
             <view className='explain-text'>{DIM_EXPLAIN[explainDim]}</view>
             <view className='explain-behavior'>{DIM_LEVEL[explainDim][levelOf(r.scores[explainDim])]}</view>

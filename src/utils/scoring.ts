@@ -1,10 +1,16 @@
 import { bankOf } from '../data/banks'
 import { ARCHETYPES, DIM_META, DIM_ORDER, FUN_TITLES } from '../data/archetypes'
-import { CAREERS, careerTopDims } from '../data/careers'
-import { AnswerValue, DimKey, DimScores, Question, TestResult, Version } from '../data/types'
+import { CAREERS } from '../data/careers'
+import { AnswerValue, CareerMatch, DimKey, DimScores, Question, TestResult, Version } from '../data/types'
 
 /** 题库版本号：题库任何改动都要递增，报告按此存档（M7 迭代闭环） */
 export const BANK_VERSION = 'v1.0'
+/** 计分版本号：计分公式任何改动都要递增；改动须过全枚举回归（scripts/enumerate-scoring.ts，02 §8） */
+export const SCORING_VERSION = 'v2'
+
+/** 档位阈值（02 §5，全枚举标定） */
+export const ARCHETYPE_TIERS = { high: 0.8, mid: 0.6 }
+export const CAREER_TIERS = { high: 0.6, mid: 0.3 }
 
 /** 兼容 string 与 {key, ms} 两种作答值 */
 const keyOf = (v: AnswerValue | string | undefined) =>
@@ -13,7 +19,7 @@ const keyOf = (v: AnswerValue | string | undefined) =>
 const msOf = (v: AnswerValue | string | undefined) =>
   v == null || typeof v === 'string' ? 999999 : v.ms
 
-const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n))
+const EPS = 1e-9
 
 /** 汇总原始分 + 各维度理论满分（按维度独立归一化，抵消覆盖槽数差异） */
 function aggregate(questions: Question[], answers: Record<string, AnswerValue>) {
@@ -31,12 +37,44 @@ function aggregate(questions: Question[], answers: Record<string, AnswerValue>) 
   return { raw, maxRaw }
 }
 
-/** 余弦相似度 */
+/** 去均值：画像的信息全在形状里（每人卷面原始总分为常数，绝对高低无意义，02 §5） */
+function centered(v: number[]) {
+  const mean = v.reduce((s, x) => s + x, 0) / v.length
+  return v.map(x => x - mean)
+}
+
+const norm = (v: number[]) => Math.sqrt(v.reduce((s, x) => s + x * x, 0))
+
+/** 余弦；任一向量为零（完全均衡画像）时返回 0 */
 function cosine(a: number[], b: number[]) {
-  const dot = a.reduce((s, x, i) => s + x * b[i], 0)
-  const na = Math.sqrt(a.reduce((s, x) => s + x * x, 0))
-  const nb = Math.sqrt(b.reduce((s, x) => s + x * x, 0))
-  return dot / (na * nb || 1)
+  const na = norm(a)
+  const nb = norm(b)
+  if (na < EPS || nb < EPS) return 0
+  return a.reduce((s, x, i) => s + x * b[i], 0) / (na * nb)
+}
+
+/** 答卷稳定哈希（FNV-1a）：并列决胜用——同一份答卷结果恒定，人群层面不偏向任一维度 */
+function answersHash(answers: Record<string, AnswerValue>) {
+  const text = Object.keys(answers)
+    .sort()
+    .map(k => `${k}:${keyOf(answers[k])}`)
+    .join('|')
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h
+}
+
+/** 维度按选择率降序；并列时按答卷哈希轮转决胜（不按固定维度顺序） */
+function rankDims(p: DimScores, hash: number): DimKey[] {
+  const rot = hash % DIM_ORDER.length
+  const tieOrder = (d: DimKey) => (DIM_ORDER.indexOf(d) - rot + DIM_ORDER.length) % DIM_ORDER.length
+  return [...DIM_ORDER].sort((a, b) => {
+    const diff = p[b] - p[a]
+    return Math.abs(diff) > EPS ? diff : tieOrder(a) - tieOrder(b)
+  })
 }
 
 /** 质量信号：答题过快占比 + 同一选项占比（标注不拦截） */
@@ -53,23 +91,60 @@ function qualitySignals(questions: Question[], answers: Record<string, AnswerVal
   return { fastRatio: fast / done.length, sameKeyRatio: topKey / done.length }
 }
 
-/** 职业适配：权重矩阵加权平均。内部数值仅用于排序，对外档位化展示（02 §5 展示口径） */
-function matchCareers(scores: DimScores) {
-  return CAREERS.map(c => {
-    const wsum = DIM_ORDER.reduce((s, d) => s + c.weights[d], 0)
-    const v = DIM_ORDER.reduce((s, d) => s + c.weights[d] * scores[d], 0) / (wsum || 1)
-    const [wa, wb] = careerTopDims(c)
-    return {
-      name: c.name,
-      reason: `这个方向最看重你的${DIM_META[wa].label}与${DIM_META[wb].label}`,
-      percent: clamp(Math.round(v * 1.08), 60, 97)
-    }
-  }).sort((a, b) => b.percent - a.percent)
+export const careerTierOf = (r: number) =>
+  r >= CAREER_TIERS.high ? '高度适配' : r >= CAREER_TIERS.mid ? '较为适配' : '值得关注'
+
+export const archetypeTierOf = (sim: number) =>
+  sim >= ARCHETYPE_TIERS.high ? '高度匹配' : sim >= ARCHETYPE_TIERS.mid ? '较为匹配' : '特征较均衡'
+
+/**
+ * 职业适配：画像与职业需求权重都去均值后比余弦（形状相关系数 r），全库按 r 排序。
+ * 并列依次按加权选择率、职业库顺序决胜。内部数值只排序定档，对外只给档位。
+ */
+export function matchCareers(p: DimScores) {
+  const pv = DIM_ORDER.map(d => p[d])
+  const c = centered(pv)
+  return CAREERS.map((career, index) => {
+    const wv = DIM_ORDER.map(d => career.weights[d])
+    const wc = centered(wv)
+    const r = cosine(c, wc)
+    const wsum = wv.reduce((s, x) => s + x, 0)
+    const weighted = pv.reduce((s, x, i) => s + x * wv[i], 0) / (wsum || 1)
+    // 匹配理由：你与这个方向在哪两点上对得上（贡献 c[d]×wc[d] 最大的两个维度）
+    const contrib = DIM_ORDER.map((d, i) => ({ d, v: c[i] * wc[i] })).sort((a, b) => b.v - a.v)
+    const hits = contrib.filter(x => x.v > EPS).slice(0, 2).map(x => DIM_META[x.d].label)
+    const reason =
+      hits.length === 2
+        ? `你在${hits[0]}与${hits[1]}上的倾向，正是这个方向更看重的`
+        : hits.length === 1
+          ? `你在${hits[0]}上的倾向，正是这个方向更看重的`
+          : '这个方向与你的画像有部分交集'
+    return { name: career.name, reason, r, weighted, index }
+  }).sort((a, b) => {
+    if (Math.abs(b.r - a.r) > EPS) return b.r - a.r
+    if (Math.abs(b.weighted - a.weighted) > EPS) return b.weighted - a.weighted
+    return a.index - b.index
+  })
+}
+
+/** 迫选镜像回显（06 §3）：直接复述用户在迫选题上的取舍 */
+function forcedMirror(questions: Question[], answers: Record<string, AnswerValue>) {
+  const dimOf = (o?: { scores: Partial<DimScores> }) =>
+    o ? DIM_ORDER.find(d => (o.scores[d] || 0) > 0) : undefined
+  const lines: string[] = []
+  for (const q of questions) {
+    if (q.type !== 'forced') continue
+    const key = keyOf(answers[q.id])
+    const a = dimOf(q.options.find(o => o.key === key))
+    const b = dimOf(q.options.find(o => o.key !== key))
+    if (a && b) lines.push(`在${DIM_META[b].label}与${DIM_META[a].label}之间，你选择了${DIM_META[a].label}`)
+  }
+  return lines
 }
 
 /**
- * 计分引擎（规范见项目记录《02-模块设计-题库》与《13-题库工程规范-代码侧》）：
- * 逐题投票 → 按维度独立归一化（35~99）→ 相似度匹配原型 → 职业权重矩阵匹配 top3
+ * 计分引擎 v2（规范见项目记录《02-模块设计-题库》§5 与《13-题库工程规范-代码侧》）：
+ * 逐题投票 → 选择率 → 雷达（相对自身）→ 去均值余弦匹配原型与职业 → 档位
  */
 export function computeResult(
   version: Version,
@@ -77,7 +152,7 @@ export function computeResult(
 ): TestResult {
   const questions = bankOf(version)
 
-  // 完成度守门（盲审修订）：空卷/半卷不允许生成报告，逐题校验而非键数统计
+  // 完成度守门：空卷/半卷不允许生成报告，逐题校验而非键数统计
   const unanswered = questions.filter(q => !answers[q.id])
   if (unanswered.length > 0) {
     throw new Error(`INCOMPLETE_ANSWERS:${unanswered.length}`)
@@ -85,67 +160,75 @@ export function computeResult(
 
   const { raw, maxRaw } = aggregate(questions, answers)
 
+  // 选择率 p[d] ∈ [0,1]：随机作答时各维期望相同
+  const p: DimScores = { insight: 0, creativity: 0, action: 0, collab: 0, stability: 0 }
+  for (const dim of DIM_ORDER) p[dim] = maxRaw[dim] > 0 ? raw[dim] / maxRaw[dim] : 0
+  const pMax = Math.max(...DIM_ORDER.map(d => p[d]))
+
+  // 雷达（相对自身）：最强维恒为 95，其余按与最强维的比例
   const scores: DimScores = { insight: 0, creativity: 0, action: 0, collab: 0, stability: 0 }
-  for (const dim of DIM_ORDER) {
-    scores[dim] = maxRaw[dim] > 0 ? clamp(Math.round(35 + (raw[dim] / maxRaw[dim]) * 64), 35, 99) : 35
-  }
-  const topDims = [...DIM_ORDER].sort((a, b) => scores[b] - scores[a])
+  for (const dim of DIM_ORDER) scores[dim] = pMax > 0 ? Math.round(40 + (55 * p[dim]) / pMax) : 40
+
+  const topDims = rankDims(p, answersHash(answers))
   const [d1, d2] = topDims
-  const n1 = DIM_META[d1].label
-  const n2 = DIM_META[d2].label
-  const qc = qualitySignals(questions, answers)
+  const tieTop = Math.abs(p[d1] - p[d2]) < EPS
+  const careers = matchCareers(p)
+  const base = {
+    version,
+    scores,
+    topDims,
+    radarLabels: DIM_ORDER.map(d => DIM_META[d].label),
+    qc: qualitySignals(questions, answers),
+    bankVersion: BANK_VERSION,
+    scoringVersion: SCORING_VERSION
+  }
 
   if (version === 'fun') {
     const fun = FUN_TITLES[d1]
+    const coreInsight = tieTop
+      ? `你的天赋关键词是「${fun.title}」——你在${DIM_META[d1].label}与${DIM_META[d2].label}上的倾向不分伯仲。${fun.line}。`
+      : `你的天赋关键词是「${fun.title}」。${fun.line}。`
     return {
-      version,
-      scores,
-      topDims,
+      ...base,
       archetypeName: fun.title,
       slogan: fun.line,
-      coreInsight: `你的天赋关键词是「${fun.title}」。${fun.line}。`,
-      radarLabels: DIM_ORDER.map(d => DIM_META[d].label),
-      // 不点名钩子：较为适配的职业方向数量（D16 盲审修订）
-      careerFitHint: matchCareers(scores).filter(c => c.percent >= 65).length,
-      qc,
-      bankVersion: BANK_VERSION
+      coreInsight,
+      // 不点名钩子：较为适配及以上的职业方向数量（全枚举 5~15，从不为 0）
+      careerFitHint: careers.filter(c => c.r >= CAREER_TIERS.mid).length
     }
   }
 
-  // 原型 = 五维画像与 10 张理想画像（coreDims: 1.0 / 0.92 / 0.5）的余弦相似度最高者
-  const profile = DIM_ORDER.map(d => scores[d] / 100)
-  let bestKey = 'creativity+insight'
-  let bestSim = -1
+  // 原型 = 去均值画像与去均值理想画像（coreDims: 1.0 / 0.92 / 0.5）余弦最高者
+  const c = centered(DIM_ORDER.map(d => p[d]))
+  let bestKey = Object.keys(ARCHETYPES)[0]
+  let bestSim = -Infinity
   for (const [key, arch] of Object.entries(ARCHETYPES)) {
-    const ideal = DIM_ORDER.map(d =>
-      d === arch.coreDims[0] ? 1 : d === arch.coreDims[1] ? 0.92 : 0.5
+    const ideal = centered(
+      DIM_ORDER.map(d => (d === arch.coreDims[0] ? 1 : d === arch.coreDims[1] ? 0.92 : 0.5))
     )
-    const sim = cosine(profile, ideal)
-    if (sim > bestSim) {
+    const sim = cosine(c, ideal)
+    if (sim > bestSim + EPS) {
       bestSim = sim
       bestKey = key
     }
   }
   const archetype = ARCHETYPES[bestKey]
-  const archetypeMatch = clamp(Math.round(60 + (bestSim - 0.9) * 475), 60, 98)
-  const fitIndex = clamp(Math.round(scores[d1] * 0.6 + scores[d2] * 0.4), 60, 98)
-
-  // 职业适配 = 权重矩阵加权平均，全库排序取 top3（对外档位化展示）
-  const careers = matchCareers(scores).slice(0, 3)
+  const [a1, a2] = archetype.coreDims
+  const top3: CareerMatch[] = careers.slice(0, 3).map(x => ({
+    name: x.name,
+    reason: x.reason,
+    tier: careerTierOf(x.r)
+  }))
 
   return {
-    version,
-    scores,
-    topDims,
+    ...base,
     archetypeName: archetype.name,
     slogan: archetype.slogan,
-    coreInsight: `你最突出的能力是${n1}与${n2}。${archetype.strength}。`,
-    archetypeMatch,
-    fitIndex,
-    radarLabels: DIM_ORDER.map(d => DIM_META[d].label),
-    careers,
-    advice: archetype.advice,
-    qc,
-    bankVersion: BANK_VERSION
+    // 核心洞察引用原型自身维度，与称号同源（02 §5 ③）
+    coreInsight: `你最常展现的是${DIM_META[a1].label}与${DIM_META[a2].label}的倾向。${archetype.strength}。`,
+    archetypeTier: archetypeTierOf(bestSim),
+    careers: top3,
+    mirror: forcedMirror(questions, answers),
+    advice: archetype.advice
   }
 }

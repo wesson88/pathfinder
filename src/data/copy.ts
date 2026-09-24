@@ -5,16 +5,16 @@ import { DimKey } from './types'
  * 红线（M9）：不出现「专业心理测评/最准/科学测算」等表述。
  */
 
-/** 维度解释（雷达图点按浮层第一行，30 字左右） */
+/** 维度解释（雷达图点按浮层第一行，30 字左右；测的是倾向而非能力，02 §2） */
 export const DIM_EXPLAIN: Record<DimKey, string> = {
-  insight: '从复杂信息里抓住关键规律的能力——别人看到现象，你看到结构。',
-  creativity: '产生新想法、新角度的能力——把「大家都这么做」变成「还能那样」。',
-  action: '把想法推向现实的推进力——少纠结、多出手、用结果说话。',
-  collab: '与人配合、撬动群体的能力——让一加一大于二。',
-  stability: '持续、可靠、有秩序的产出能力——说到做到的确定性。'
+  insight: '倾向先抓住复杂信息里的关键规律——别人看到现象，你更常看到结构。',
+  creativity: '倾向寻找新想法、新角度——把「大家都这么做」变成「还能那样」。',
+  action: '倾向尽快把想法推向现实——少纠结、多出手、用结果说话。',
+  collab: '倾向与人配合、带动群体——让一加一大于二。',
+  stability: '倾向持续、有秩序地推进——说到做到的确定性。'
 }
 
-/** 分数段行为化描述（浮层第二行；低分零负面词，用「待激活」框架） */
+/** 分段行为化描述（浮层第二行；分段按相对自身的雷达值；低分零负面词，用「待激活」框架） */
 export const DIM_LEVEL: Record<DimKey, { high: string; mid: string; low: string }> = {
   insight: {
     high: '你常常第一个问「我们真正要解决的是什么」。',
@@ -39,12 +39,13 @@ export const DIM_LEVEL: Record<DimKey, { high: string; mid: string; low: string 
   stability: {
     high: '交给你的事，大家从来不用问第二遍。',
     mid: '你的可靠体现在关键节点从不掉链子。',
-    low: '灵活应变是你的强项，计划赶不上你的变化。'
+    low: '你更习惯随机应变，计划对你来说是参考而不是约束。'
   }
 }
 
 export type LevelName = 'high' | 'mid' | 'low'
 
+/** v2 雷达相对自身（最强维恒为 95，恒在优势区）；v1 旧报告沿用同一阈值 */
 export const levelOf = (score: number): LevelName => (score >= 80 ? 'high' : score >= 60 ? 'mid' : 'low')
 
 export const LEVEL_LABEL: Record<LevelName, string> = {
@@ -79,9 +80,9 @@ export const UPSELL_COPY = {
 export const upsellDesc = (n: number) =>
   `你的画像已与 ${n} 个职业方向较为适配——它们是谁？PRO 报告还包含你的职业原型与成长行动建议`
 
-/** 分享模板（D19 转发卡片） */
+/** 分享模板（D19 转发卡片；不带任何百分比，08 §2） */
 export const SHARE_COPY = {
-  pro: (name: string, fit: number) => `我的天赋原型是「${name}」，职业适配 ${fit}%`,
+  pro: (name: string) => `我的天赋原型是「${name}」，来测测你的？`,
   fun: (title: string) => `我的趣味天赋是「${title}」，来测测你的？`,
   homeTitle: '天赋星球｜找到让你闪闪发光的职业'
 }
@@ -93,8 +94,10 @@ export const TESTIMONIALS = [
   { who: '设计师 · 内测体验官', text: '几分钟做完，结果比想象中细致，转给了整个组。' }
 ]
 
-/** 档位化展示（裁决单 C2 防伪精度）：内部数值仅排序，对外一律档位 + 脚注 */
-export const archetypeTier = (match: number) => (match >= 80 ? '高度匹配' : '较为匹配')
-export const careerTier = (percent: number) =>
+/** 档位化展示：v2 结果自带档位；以下两个仅用于 v1 旧报告兼容（按旧百分比换算档位） */
+export const legacyArchetypeTier = (match: number) => (match >= 80 ? '高度匹配' : '较为匹配')
+export const legacyCareerTier = (percent: number) =>
   percent >= 80 ? '高度适配' : percent >= 65 ? '较为适配' : '值得关注'
 export const MATCH_FOOTNOTE = '匹配度为题库内相对匹配度，非客观预测'
+/** 雷达图说明：v2 雷达是相对自身的形状，不与他人比较 */
+export const RADAR_NOTE = '雷达图展示的是你自己五个维度之间的相对倾向，不与他人比较'

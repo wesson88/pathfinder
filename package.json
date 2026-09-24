@@ -5,7 +5,9 @@
   "description": "天赋星球——职业天赋测评微信小程序（Taro 4 + React + TypeScript + 微信云开发）",
   "scripts": {
     "dev:weapp": "npm run build:weapp -- --watch",
-    "build:weapp": "taro build --type weapp"
+    "build:weapp": "taro build --type weapp",
+    "typecheck": "tsc --noEmit",
+    "test:scoring": "tsx scripts/enumerate-scoring.ts"
   },
   "browserslist": [
     "last 3 versions",
@@ -39,6 +41,7 @@
     "@types/webpack-env": "^1.18.4",
     "babel-preset-taro": "4.0.9",
     "sass": "^1.75.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.4.5",
     "webpack": "^5.91.0"
   }

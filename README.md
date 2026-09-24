@@ -39,7 +39,8 @@ cloud/functions/      login getStats submitTest getReports createOrder payCallba
   落账一律以 `cloudPay.queryOrder` 权威查单结果为准——回调事件字段可被 callFunction 直调伪造，不采信。
 - **清除数据**：报告/会话/事件/反馈删除，订单匿名化留存（已支付订单保留归属，付费权益不受影响），计数同步回减。
 - **iOS 分阶段**：`PAY_IOS_MODE='hidden'`（PRO 卡整体不展示）→ 开通虚拟支付后切 `'iap'`，不改代码（D12）。
-- **档位化展示**：匹配度/职业吻合度内部数值仅排序，对外展示档位 + 脚注（盲审 C2 防伪精度）。
+- **计分 v2（只比形状）**：选择率 → 雷达相对自身 → 去均值余弦匹配原型与职业 → 对外只给档位 + 脚注（D27）。
+  计分/题库/职业库/原型任何改动须跑 `npm run test:scoring`（全枚举 419 万种 PRO 答法，约 6 分钟，带门槛判定）。
 
 ## 联调清单（上线前）
 

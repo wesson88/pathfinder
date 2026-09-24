@@ -19,7 +19,7 @@ export interface Question {
   type?: 'single' | 'forced'
   /** PRO 版题目分类，如「职业行为偏好」 */
   category?: string
-  /** 出题说明，如「本题用于评估模糊情境下的认知偏好」 */
+  /** 作答提示（仅迫选题使用；不得暴露测量意图，02 §4） */
   hint?: string
   question: string
   options: QuestionOption[]
@@ -28,8 +28,10 @@ export interface Question {
 export interface CareerMatch {
   name: string
   reason: string
-  /** 适配百分比 */
-  percent: number
+  /** 计分 v2：适配档位（高度适配 / 较为适配 / 值得关注） */
+  tier?: string
+  /** 计分 v1 遗留：旧报告的内部百分比，仅用于兼容展示档位 */
+  percent?: number
 }
 
 /** PRO 版职业原型（五维画像与理想画像相似度匹配） */
@@ -51,7 +53,7 @@ export interface FunTitle {
 /** 计分产物，云端与本地缓存统一结构 */
 export interface TestResult {
   version: Version
-  /** 各维度归一化得分 35-99 */
+  /** 雷达值（v2：相对自身 40-95，最强维恒为 95；v1 旧报告为 35-99 绝对刻度） */
   scores: DimScores
   /** 按得分排序的维度 key，topDims[0] 最强 */
   topDims: DimKey[]
@@ -59,10 +61,14 @@ export interface TestResult {
   archetypeName: string
   slogan: string
   coreInsight: string
-  /** pro 专属：与理想画像的匹配度 60-98 */
+  /** PRO 专属（v2）：原型匹配档位（高度匹配 / 较为匹配 / 特征较均衡） */
+  archetypeTier?: string
+  /** v1 遗留：原型匹配度 60-98，旧报告兼容展示 */
   archetypeMatch?: number
-  /** PRO 专属：职业适配指数 */
+  /** v1 遗留：职业适配指数（v2 不再输出） */
   fitIndex?: number
+  /** PRO 专属：迫选镜像回显（「在洞察与创造之间，你选择了洞察」） */
+  mirror?: string[]
   radarLabels?: string[]
   careers?: CareerMatch[]
   advice?: { amplify: string; blindSpot: string }
@@ -70,7 +76,9 @@ export interface TestResult {
   qc?: { fastRatio: number; sameKeyRatio: number }
   /** 题库版本号，改题后旧报告按旧版口径展示不迁移 */
   bankVersion?: string
-  /** fun 专属：不点名的职业适配钩子——与你较为适配的职业方向数量（D16 盲审修订：数量钩子替代卖点罗列） */
+  /** 计分版本号（v2 起写入；缺省视为 v1） */
+  scoringVersion?: string
+  /** fun 专属：不点名的职业适配钩子——较为适配及以上的职业方向数量（v2 全枚举 5~15） */
   careerFitHint?: number
 }
 
